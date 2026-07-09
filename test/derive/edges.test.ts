@@ -9,7 +9,7 @@ import {
   customerOnboarding,
   leadRouting,
   refundReviewAgent,
-} from "@/test/fixtures/n8n";
+} from "@/lib/demo/fixtures";
 
 describe("edge extraction", () => {
   it("Tier A: workflow → workflow from Execute Workflow nodes", () => {

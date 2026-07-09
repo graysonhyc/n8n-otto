@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { composeRegistry } from "@/lib/derive/registry";
-import { allWorkflows, executions } from "@/test/fixtures/n8n";
+import { allWorkflows, executions } from "@/lib/demo/fixtures";
 import type { Owner } from "@/lib/backoffice/types";
 
 describe("composeRegistry", () => {

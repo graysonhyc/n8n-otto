@@ -1,13 +1,24 @@
 import { PageHeader } from "@/components/shell/AppShell";
+import { RegistryClient } from "@/components/registry/RegistryClient";
+import { Chip } from "@/components/ui/Chip";
+import { loadRegistry } from "@/lib/data/load";
 
-export default function RegistryPage() {
+export const dynamic = "force-dynamic";
+
+export default async function RegistryPage() {
+  const { items, live } = await loadRegistry();
+  const agents = items.filter((i) => i.hasAgent).length;
+
   return (
     <div className="p-5">
       <PageHeader
         title="Automation Registry"
-        subtitle="What is running and what it does"
+        subtitle={`${items.length} workflows · ${agents} AI agents`}
+        actions={
+          <Chip>{live ? "Live instance" : "Demo data"}</Chip>
+        }
       />
-      <p className="text-sm text-muted">Inventory table lands here (Chunk 2).</p>
+      <RegistryClient items={items} />
     </div>
   );
 }

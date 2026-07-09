@@ -1,0 +1,6 @@
+$ next start -p 3111
+▲ Next.js 16.2.10
+- Local:         http://localhost:3111
+- Network:       http://192.168.50.100:3111
+✓ Ready in 67ms
+[ELIFECYCLE] Command failed with exit code 143.

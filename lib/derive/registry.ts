@@ -19,6 +19,7 @@ export interface RegistryItem {
   type: WorkflowType;
   usesAI: boolean;
   hasAgent: boolean;
+  humanInLoop: boolean;
   hasToolAccess: boolean;
   systems: string[];
   trigger: TriggerKind;
@@ -121,6 +122,7 @@ export function composeRegistryItem(
     type: c.type,
     usesAI: c.usesAI,
     hasAgent: c.hasAgent,
+    humanInLoop: c.humanInLoop,
     hasToolAccess,
     systems: c.systems,
     trigger: c.trigger.kind,

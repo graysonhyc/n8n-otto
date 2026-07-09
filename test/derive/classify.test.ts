@@ -5,7 +5,7 @@ import {
   leadRouting,
   ptoApprovalBot,
   refundReviewAgent,
-} from "@/test/fixtures/n8n";
+} from "@/lib/demo/fixtures";
 
 describe("classify", () => {
   it("classifies an AI agent with tools", () => {
