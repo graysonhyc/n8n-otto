@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const SCOPES = ["channels:read", "groups:read", "chat:write", "commands"];
+const SCOPES = ["channels:read", "groups:read", "chat:write"];
 
 export async function GET(request: Request) {
   const clientId = process.env.SLACK_CLIENT_ID;

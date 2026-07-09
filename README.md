@@ -42,8 +42,10 @@ to enable the Slack app.
 
 ## Slack app setup
 
-1. Create a Slack app (from scratch). Add **Bot Token Scopes**: `channels:read`,
-   `groups:read`, `chat:write`, `commands`.
+1. Create a Slack app **from the manifest** at `docs/slack-app-manifest.yaml`
+   (api.slack.com/apps → Create New App → From a manifest). This defines the
+   **bot user** + Bot Token Scopes `channels:read`, `groups:read`, `chat:write`.
+   (Without bot scopes, Slack shows "this app doesn't have a bot user to install".)
 2. **OAuth redirect URL:** `${APP_BASE_URL}/api/slack/oauth`
 3. **Interactivity request URL:** `${APP_BASE_URL}/api/slack/interactivity`
 4. Copy Client ID / Client Secret / Signing Secret into `.env.local`.

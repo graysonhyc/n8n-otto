@@ -1,0 +1,43 @@
+# Slack app manifest for n8n Backoffice.
+#
+# Use it in EITHER of two ways:
+#   A) New app:  api.slack.com/apps → Create New App → "From a manifest" → paste this.
+#   B) Existing app: App settings → "App Manifest" → paste + save. This adds the
+#      bot user + scopes (fixes "this app doesn't have a bot user to install").
+#
+# After creating/updating: OAuth & Permissions → Install to Workspace, OR just
+# hit http://localhost:3000/api/slack/install once the redirect URL below is set.
+#
+# Interactivity is disabled here because Slack requires a PUBLIC https URL for it.
+# After deploying (e.g. Vercel), set is_enabled: true and request_url to
+# https://<your-domain>/api/slack/interactivity, then reinstall.
+
+display_information:
+  name: n8n Backoffice
+  description: Operational alerts, approvals, and the daily brief for your n8n automations.
+  background_color: "#ea4b71"
+
+features:
+  bot_user:
+    display_name: n8n Backoffice
+    always_online: true
+
+oauth_config:
+  redirect_urls:
+    - http://localhost:3000/api/slack/oauth
+    # Add your deployed URL too, e.g.
+    # - https://your-app.vercel.app/api/slack/oauth
+  scopes:
+    bot:
+      - channels:read
+      - groups:read
+      - chat:write
+
+settings:
+  interactivity:
+    is_enabled: false
+    # After deploy, flip to true and set:
+    # request_url: https://your-app.vercel.app/api/slack/interactivity
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
