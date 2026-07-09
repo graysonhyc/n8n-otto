@@ -25,9 +25,8 @@ features:
 
 oauth_config:
   redirect_urls:
+    - https://n8n-backoffice.vercel.app/api/slack/oauth
     - http://localhost:3000/api/slack/oauth
-    # Add your deployed URL too, e.g.
-    # - https://your-app.vercel.app/api/slack/oauth
   scopes:
     bot:
       - channels:read
@@ -36,9 +35,8 @@ oauth_config:
 
 settings:
   interactivity:
-    is_enabled: false
-    # After deploy, flip to true and set:
-    # request_url: https://your-app.vercel.app/api/slack/interactivity
+    is_enabled: true
+    request_url: https://n8n-backoffice.vercel.app/api/slack/interactivity
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
