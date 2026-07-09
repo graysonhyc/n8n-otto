@@ -6,7 +6,7 @@ export type Severity = "high" | "medium" | "low";
 export interface BriefItem {
   key: string;
   severity: Severity;
-  category: "change" | "ownership" | "shared-resource" | "governance" | "hygiene";
+  category: "change" | "ownership" | "shared-resource" | "governance" | "hygiene" | "incident";
   title: string;
   whatHappened: string;
   whyItMatters: string;
@@ -47,6 +47,24 @@ function promptItem(item: RegistryItem, change: Extract<ChangeEvent, { kind: "pr
     recommendedAction: "Request approval before production use.",
     workflowId: item.id,
     actions: ["Open in n8n", "Request approval", "Rollback prompt", "Create Linear ticket"],
+  };
+}
+
+function incidentItem(item: RegistryItem): BriefItem | null {
+  if (item.health.recentFailures < 3) return null;
+  return {
+    key: `incident:${item.id}:failures`,
+    severity: "high",
+    category: "incident",
+    title: `${item.name} failed ${item.health.recentFailures} times recently`,
+    whatHappened: `${item.health.recentFailures} failed executions${
+      item.systems.length ? ` — may affect ${item.systems.join(", ")}` : ""
+    }.`,
+    whyItMatters: "Downstream steps and dependent workflows may be blocked.",
+    suggestedOwner: item.owner?.team ?? item.project ?? "Unassigned",
+    recommendedAction: "Check the connection, then replay failed executions.",
+    workflowId: item.id,
+    actions: ["Open in n8n", "Assign owner", "Create Linear ticket"],
   };
 }
 
@@ -119,6 +137,8 @@ export function buildBrief(input: {
     for (const change of input.changes.get(item.id) ?? []) {
       if (change.kind === "prompt") out.push(promptItem(item, change));
     }
+    const incident = incidentItem(item);
+    if (incident) out.push(incident);
     const own = ownershipItem(item);
     if (own) out.push(own);
     const gov = governanceItem(item);

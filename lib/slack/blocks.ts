@@ -1,0 +1,106 @@
+import type { KnownBlock } from "@slack/web-api";
+import type { BriefItem, Severity } from "@/lib/brief/build";
+
+const EMOJI: Record<Severity, string> = { high: "🔴", medium: "🟠", low: "🟡" };
+
+function button(text: string, actionId: string, value: string, style?: "primary" | "danger") {
+  return {
+    type: "button" as const,
+    text: { type: "plain_text" as const, text, emoji: true },
+    action_id: actionId,
+    value,
+    ...(style ? { style } : {}),
+  };
+}
+
+// A single Brief item as a Slack message (used for health/change alerts).
+export function briefItemBlocks(item: BriefItem, routedNote?: string): KnownBlock[] {
+  const value = JSON.stringify({ key: item.key, workflowId: item.workflowId });
+  const blocks: KnownBlock[] = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `${EMOJI[item.severity]} *${item.title}*`,
+      },
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*What*\n${item.whatHappened}` },
+        { type: "mrkdwn", text: `*Why it matters*\n${item.whyItMatters}` },
+        { type: "mrkdwn", text: `*Owner*\n${item.suggestedOwner}` },
+        { type: "mrkdwn", text: `*Recommended*\n${item.recommendedAction}` },
+      ],
+    },
+  ];
+
+  if (routedNote) {
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: routedNote }],
+    });
+  }
+
+  const actions = [
+    button("Open in n8n", "open_in_n8n", value),
+    button("Assign owner", "assign_owner", value),
+    button("Create Linear ticket", "create_ticket", value),
+    button("Acknowledge", "acknowledge", value, "primary"),
+  ];
+  if (item.category === "change") {
+    actions.splice(1, 0, button("Approve", "approve_change", value, "primary"));
+    actions.push(button("Rollback prompt", "rollback_prompt", value, "danger"));
+  }
+  blocks.push({ type: "actions", elements: actions.slice(0, 5) });
+  return blocks;
+}
+
+// Ownership confirmation prompt.
+export function ownershipCheckBlocks(input: {
+  workflowId: string;
+  name: string;
+  suggestedOwner: string;
+  reason: string;
+}): KnownBlock[] {
+  const value = JSON.stringify({ workflowId: input.workflowId, team: input.suggestedOwner });
+  return [
+    { type: "section", text: { type: "mrkdwn", text: `🔵 *Ownership check — ${input.name}*` } },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Suggested owner*\n${input.suggestedOwner}` },
+        { type: "mrkdwn", text: `*Reason*\n${input.reason}` },
+      ],
+    },
+    {
+      type: "actions",
+      elements: [
+        button("Confirm owner", "confirm_owner", value, "primary"),
+        button("Reassign", "reassign_owner", value),
+        button("Not my team", "reject_owner", value, "danger"),
+      ],
+    },
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: "Confirmation writes back to the Backoffice registry." }],
+    },
+  ];
+}
+
+// The daily brief digest.
+export function briefDigestBlocks(items: BriefItem[]): KnownBlock[] {
+  const header: KnownBlock = {
+    type: "header",
+    text: { type: "plain_text", text: `📋 Backoffice Brief — ${items.length} need attention`, emoji: true },
+  };
+  const lines = items.slice(0, 8).map((i) => `${EMOJI[i.severity]} *${i.title}* — ${i.recommendedAction}`);
+  return [
+    header,
+    { type: "section", text: { type: "mrkdwn", text: lines.join("\n") || "All clear." } },
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: "Per-team slices posted to each owner channel." }],
+    },
+  ];
+}
