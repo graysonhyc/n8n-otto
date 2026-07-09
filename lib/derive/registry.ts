@@ -1,6 +1,7 @@
 import type { N8nExecution, N8nWorkflow, WorkflowType, TriggerKind } from "@/lib/n8n/types";
 import type { Owner } from "@/lib/backoffice/types";
 import { classify } from "./classify";
+import { unreachableNodes } from "./structure";
 
 export interface Health {
   recentFailures: number;
@@ -33,6 +34,7 @@ export interface RegistryItem {
   risk: RiskAssessment;
   lastChange: string | null;
   project: string | null;
+  disconnectedNodes: string[];
 }
 
 // Systems that touch customers / money → raise criticality.
@@ -76,9 +78,17 @@ function assessRisk(input: {
   humanInLoop: boolean;
   stale: boolean;
   systems: string[];
+  disconnectedCount: number;
 }): RiskAssessment {
   const reasons: string[] = [];
   let score = 0;
+
+  if (input.disconnectedCount > 0) {
+    score += 2;
+    reasons.push(
+      `${input.disconnectedCount} disconnected node(s) — steps may be skipped silently`,
+    );
+  }
 
   if (input.active && input.type === "ai-agent-tools" && !input.humanInLoop) {
     score += 2;
@@ -111,6 +121,7 @@ export function composeRegistryItem(
 ): RegistryItem {
   const c = classify(workflow);
   const health = computeHealth(executions, workflow.id);
+  const disconnectedNodes = unreachableNodes(workflow);
   const hasToolAccess = c.toolNames.length > 0;
   const lastChange = workflow.updatedAt ?? null;
   const stale = isStale(lastChange, now);
@@ -142,9 +153,11 @@ export function composeRegistryItem(
       humanInLoop: c.humanInLoop,
       stale,
       systems: c.systems,
+      disconnectedCount: disconnectedNodes.length,
     }),
     lastChange,
     project: workflow.homeProject?.name ?? null,
+    disconnectedNodes,
   };
 }
 

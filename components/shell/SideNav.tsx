@@ -21,16 +21,16 @@ const BACKOFFICE: Item[] = [
 
 function Row({ item, active }: { item: Item; active: boolean }) {
   const base =
-    "flex items-center gap-2.5 rounded-[7px] px-2.5 py-1.5 text-[13px]";
+    "flex items-center gap-3 rounded-[8px] px-3 py-2 text-[16px]";
   if (item.soon) {
     return (
       <span
         className={`${base} cursor-default text-faint/70`}
         title="Coming in a later phase"
       >
-        <span className="w-[15px] text-center opacity-70">{item.glyph}</span>
+        <span className="w-[18px] text-center text-[17px] opacity-70">{item.glyph}</span>
         {item.label}
-        <span className="ml-auto text-[9px] uppercase tracking-wider text-faint">
+        <span className="ml-auto text-[10px] uppercase tracking-wider text-faint">
           soon
         </span>
       </span>
@@ -45,13 +45,13 @@ function Row({ item, active }: { item: Item; active: boolean }) {
       }`}
     >
       <span
-        className={`w-[15px] text-center ${active ? "text-accent" : "opacity-80"}`}
+        className={`w-[18px] text-center text-[17px] ${active ? "text-accent" : "opacity-80"}`}
       >
         {item.glyph}
       </span>
       {item.label}
       {item.badge ? (
-        <span className="ml-auto rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">
+        <span className="ml-auto rounded-full bg-danger px-2 text-[11px] font-bold text-white">
           {item.badge}
         </span>
       ) : null}
@@ -62,11 +62,11 @@ function Row({ item, active }: { item: Item; active: boolean }) {
 export function SideNav() {
   const pathname = usePathname();
   return (
-    <aside className="border-r border-line bg-panel px-3 py-4">
-      <div className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-faint">
+    <aside className="border-r border-line bg-panel px-3 py-5">
+      <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
         Backoffice
       </div>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1">
         {BACKOFFICE.map((item) => (
           <Row
             key={item.href}
@@ -75,10 +75,10 @@ export function SideNav() {
           />
         ))}
       </div>
-      <div className="mt-5 mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-faint">
+      <div className="mt-6 mb-2 px-2 text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
         n8n
       </div>
-      <div className="flex flex-col gap-0.5 opacity-60">
+      <div className="flex flex-col gap-1 opacity-60">
         {[
           ["⌂", "Overview"],
           ["▸", "Workflows"],
@@ -87,9 +87,9 @@ export function SideNav() {
         ].map(([g, l]) => (
           <span
             key={l}
-            className="flex cursor-default items-center gap-2.5 rounded-[7px] px-2.5 py-1.5 text-[13px] text-muted"
+            className="flex cursor-default items-center gap-3 rounded-[8px] px-3 py-2 text-[16px] text-muted"
           >
-            <span className="w-[15px] text-center opacity-80">{g}</span>
+            <span className="w-[18px] text-center text-[17px] opacity-80">{g}</span>
             {l}
           </span>
         ))}

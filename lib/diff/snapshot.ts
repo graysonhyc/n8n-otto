@@ -11,6 +11,7 @@ export interface SnapshotFields {
   prompts: Record<string, string>; // node name → system message
   tools: string[]; // sorted tool node names
   credentials: string[]; // sorted credential ids
+  structure: string; // fingerprint of the connection graph (source→target edges)
 }
 
 export type ChangeEvent =
@@ -19,7 +20,8 @@ export type ChangeEvent =
   | { kind: "tool-access"; added: string[]; removed: string[] }
   | { kind: "trigger"; old: string | null; new: string | null }
   | { kind: "active"; old: boolean; new: boolean }
-  | { kind: "credential"; added: string[]; removed: string[] };
+  | { kind: "credential"; added: string[]; removed: string[] }
+  | { kind: "structure" };
 
 function extractPrompts(workflow: N8nWorkflow): Record<string, string> {
   const out: Record<string, string> = {};
@@ -39,6 +41,18 @@ function extractCredentials(workflow: N8nWorkflow): string[] {
   return [...ids].sort();
 }
 
+function structureFingerprint(workflow: N8nWorkflow): string {
+  const edges: string[] = [];
+  for (const [source, byType] of Object.entries(workflow.connections)) {
+    for (const [type, groups] of Object.entries(byType)) {
+      for (const group of groups) {
+        for (const t of group) edges.push(`${source}>${t.node}:${type}`);
+      }
+    }
+  }
+  return edges.sort().join("|");
+}
+
 export function snapshotFields(workflow: N8nWorkflow): SnapshotFields {
   const c = classify(workflow);
   return {
@@ -50,6 +64,7 @@ export function snapshotFields(workflow: N8nWorkflow): SnapshotFields {
       .map((e) => e.to)
       .sort(),
     credentials: extractCredentials(workflow),
+    structure: structureFingerprint(workflow),
   };
 }
 
@@ -99,6 +114,10 @@ export function diffFields(prev: SnapshotFields, next: SnapshotFields): ChangeEv
   const creds = setDiff(prev.credentials, next.credentials);
   if (creds.added.length || creds.removed.length) {
     events.push({ kind: "credential", ...creds });
+  }
+
+  if (prev.structure !== next.structure) {
+    events.push({ kind: "structure" });
   }
 
   return events;

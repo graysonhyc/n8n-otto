@@ -68,6 +68,26 @@ function incidentItem(item: RegistryItem): BriefItem | null {
   };
 }
 
+function danglingItem(item: RegistryItem): BriefItem | null {
+  if (item.disconnectedNodes.length === 0) return null;
+  const shown = item.disconnectedNodes.slice(0, 3).join(", ");
+  const more = item.disconnectedNodes.length - 3;
+  return {
+    key: `structure:${item.id}:dangling`,
+    severity: item.active ? "high" : "medium",
+    category: "hygiene",
+    title: `${item.name} has disconnected steps`,
+    whatHappened: `${item.disconnectedNodes.length} node(s) are unreachable from the trigger: ${shown}${
+      more > 0 ? ` +${more} more` : ""
+    }.`,
+    whyItMatters: "These steps will silently never run — the workflow may look healthy while skipping work.",
+    suggestedOwner: item.owner?.team ?? item.project ?? "Unassigned",
+    recommendedAction: "Reconnect or remove the dangling nodes in n8n.",
+    workflowId: item.id,
+    actions: ["Open in n8n", "Assign owner"],
+  };
+}
+
 function ownershipItem(item: RegistryItem): BriefItem | null {
   if (item.owner) return null;
   if (!item.active) return null;
@@ -137,6 +157,8 @@ export function buildBrief(input: {
     for (const change of input.changes.get(item.id) ?? []) {
       if (change.kind === "prompt") out.push(promptItem(item, change));
     }
+    const dangling = danglingItem(item);
+    if (dangling) out.push(dangling);
     const incident = incidentItem(item);
     if (incident) out.push(incident);
     const own = ownershipItem(item);

@@ -34,6 +34,15 @@ export default async function WorkflowDetail({
         }
       />
 
+      {item.disconnectedNodes.length > 0 && (
+        <div className="mb-3.5 rounded-xl border border-[#4a1f1a] bg-[#2a1512] px-4 py-3 text-[13px] text-[#ffb4ad]">
+          <b className="text-white">⚠ {item.disconnectedNodes.length} disconnected step(s).</b>{" "}
+          Unreachable from the trigger — will silently never run:{" "}
+          <span className="text-white">{item.disconnectedNodes.join(", ")}</span>. Reconnect or
+          remove them in n8n.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[1.4fr_1fr]">
         {/* Left column */}
         <div className="flex flex-col gap-3.5">

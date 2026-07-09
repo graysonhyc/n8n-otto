@@ -10,6 +10,7 @@ export interface N8nNode {
   type: string;
   parameters?: Record<string, unknown>;
   credentials?: Record<string, N8nCredentialRef>;
+  disabled?: boolean;
 }
 
 export interface N8nConnectionTarget {
