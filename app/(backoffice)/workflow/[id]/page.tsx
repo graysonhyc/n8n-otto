@@ -5,6 +5,7 @@ import { Section, KeyValue } from "@/components/ui/Section";
 import { Pill } from "@/components/ui/Pill";
 import { Chip } from "@/components/ui/Chip";
 import { Relationships } from "@/components/detail/Relationships";
+import { Icon } from "@/components/ui/Icon";
 import { TYPE_LABEL, TRIGGER_LABEL, relativeTime, riskTone, typeTone } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function WorkflowDetail({
   const { item } = detail;
 
   return (
-    <div className="p-5">
+    <div className="p-6">
       <PageHeader
         title={item.name}
         subtitle={`${item.project ?? "No project"} · last changed ${relativeTime(item.lastChange)}`}
@@ -35,11 +36,16 @@ export default async function WorkflowDetail({
       />
 
       {item.disconnectedNodes.length > 0 && (
-        <div className="mb-3.5 rounded-xl border border-[#4a1f1a] bg-[#2a1512] px-4 py-3 text-[13px] text-[#ffb4ad]">
-          <b className="text-white">⚠ {item.disconnectedNodes.length} disconnected step(s).</b>{" "}
-          Unreachable from the trigger — will silently never run:{" "}
-          <span className="text-white">{item.disconnectedNodes.join(", ")}</span>. Reconnect or
-          remove them in n8n.
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#4a1f1a] bg-[#2a1512] px-4 py-3 text-[13px] text-[#ffb4ad]">
+          <Icon name="warn" size={17} className="mt-0.5 flex-none text-danger" />
+          <div>
+            <b className="text-white">
+              {item.disconnectedNodes.length} disconnected step(s) — unreachable from the trigger.
+            </b>{" "}
+            These will silently never run:{" "}
+            <span className="font-medium text-white">{item.disconnectedNodes.join(", ")}</span>.
+            Reconnect or remove them in n8n.
+          </div>
         </div>
       )}
 
@@ -48,7 +54,7 @@ export default async function WorkflowDetail({
         <div className="flex flex-col gap-3.5">
           <Section
             title="Summary"
-            glyph="◷"
+            icon={<Icon name="clock" size={14} />}
             aside={<Chip>{enrichment.source === "ai" ? "AI summary" : "heuristic"}</Chip>}
           >
             <p className="text-[13px] text-ink">{enrichment.businessPurpose}</p>
@@ -68,7 +74,7 @@ export default async function WorkflowDetail({
 
         {/* Right column */}
         <div className="flex flex-col gap-3.5">
-          <Section title="Ownership" glyph="◑">
+          <Section title="Ownership" icon={<Icon name="people" size={14} />}>
             {item.owner ? (
               <KeyValue
                 rows={[
@@ -102,7 +108,7 @@ export default async function WorkflowDetail({
             </div>
           </Section>
 
-          <Section title="AI behaviour" glyph="◎">
+          <Section title="AI behaviour" icon={<Icon name="bot" size={14} />}>
             {item.usesAI ? (
               <KeyValue
                 rows={[
@@ -141,7 +147,7 @@ export default async function WorkflowDetail({
             <p className="mt-2.5 text-[12.5px] text-muted">{enrichment.aiBehaviour}</p>
           </Section>
 
-          <Section title="Runbook" glyph="▦" aside={<Chip>AI-generated</Chip>}>
+          <Section title="Runbook" icon={<Icon name="book" size={14} />} aside={<Chip>AI-generated</Chip>}>
             <ol className="ml-4 flex list-decimal flex-col gap-1 text-[13px] text-muted">
               {enrichment.runbook.map((step, i) => (
                 <li key={i}>{step}</li>

@@ -9,6 +9,7 @@ import { RELATION_LABEL } from "@/lib/format";
 import { Section } from "@/components/ui/Section";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { Icon } from "@/components/ui/Icon";
 
 function Ref({ id, name }: { id: string; name: string }) {
   return (
@@ -71,7 +72,7 @@ export function Relationships({
   return (
     <Section
       title="Relationships"
-      glyph="◈"
+      icon={<Icon name="map" size={14} />}
       aside={
         <Button variant="ghost" onClick={() => setAdding((v) => !v)}>
           + Add related

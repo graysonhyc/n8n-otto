@@ -2,19 +2,19 @@ import type { ReactNode } from "react";
 
 export function Section({
   title,
-  glyph,
+  icon,
   aside,
   children,
 }: {
   title: string;
-  glyph?: string;
+  icon?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-line bg-panel-2 p-4">
-      <h2 className="mb-2.5 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wider text-muted">
-        {glyph && <span className="text-accent">{glyph}</span>}
+      <h2 className="mb-3 flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.07em] text-muted">
+        {icon && <span className="text-accent">{icon}</span>}
         {title}
         {aside && <span className="ml-auto normal-case tracking-normal">{aside}</span>}
       </h2>

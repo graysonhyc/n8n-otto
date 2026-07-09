@@ -8,15 +8,20 @@ export const dynamic = "force-dynamic";
 export default async function RegistryPage() {
   const { items, live } = await loadRegistry();
   const agents = items.filter((i) => i.hasAgent).length;
+  const unowned = items.filter((i) => !i.owner).length;
 
   return (
-    <div className="p-5">
+    <div className="p-6">
       <PageHeader
         title="Automation Registry"
-        subtitle={`${items.length} workflows · ${agents} AI agents`}
-        actions={
-          <Chip>{live ? "Live instance" : "Demo data"}</Chip>
+        subtitle={
+          <>
+            <b className="font-semibold text-ink nums">{items.length}</b> workflows ·{" "}
+            <b className="font-semibold text-ink nums">{agents}</b> AI agents ·{" "}
+            <b className="font-semibold text-ink nums">{unowned}</b> unowned
+          </>
         }
+        actions={<Chip>{live ? "Live instance" : "Demo data"}</Chip>}
       />
       <RegistryClient items={items} />
     </div>

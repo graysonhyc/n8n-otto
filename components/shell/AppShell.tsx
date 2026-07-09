@@ -1,33 +1,41 @@
 import type { ReactNode } from "react";
 import { SideNav } from "./SideNav";
+import { TopBar } from "./TopBar";
+import { CommandPalette } from "./CommandPalette";
+import { ToastProvider } from "@/components/ui/Toast";
 
-// Two-column app frame: Backoffice nav · content.
+// App frame: nav rail · (command bar + scrolling content). Toasts and the
+// command palette live at the top level so any screen can reach them.
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="grid h-screen grid-cols-[248px_1fr] overflow-hidden">
-      <SideNav />
-      <main className="overflow-auto [zoom:1.1]">{children}</main>
-    </div>
+    <ToastProvider>
+      <div className="grid h-screen grid-cols-[232px_1fr] overflow-hidden">
+        <SideNav />
+        <div className="flex flex-col overflow-hidden">
+          <TopBar />
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
+      </div>
+      <CommandPalette />
+    </ToastProvider>
   );
 }
 
-// Shared page header used by every screen.
+// Shared page header used by every screen, below the command bar.
 export function PageHeader({
   title,
   subtitle,
   actions,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-4">
+    <div className="mb-4.5 flex items-end justify-between gap-4">
       <div>
-        <h1 className="text-[24px] font-semibold tracking-tight text-balance">
-          {title}
-        </h1>
-        {subtitle && <p className="mt-1 text-[15px] text-muted">{subtitle}</p>}
+        <h1 className="text-[23px] font-bold tracking-[-0.02em] text-balance">{title}</h1>
+        {subtitle && <p className="mt-1.5 text-[13.5px] text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/shell/AppShell";
-import { BriefCard } from "@/components/brief/BriefCard";
+import { BriefBoard } from "@/components/brief/BriefBoard";
 import { BriefActions } from "@/components/brief/BriefActions";
 import { loadBrief } from "@/lib/data/brief";
 
@@ -10,28 +10,26 @@ export default async function BriefPage() {
   const high = items.filter((i) => i.severity === "high").length;
 
   return (
-    <div className="p-5">
+    <div className="p-6">
       <PageHeader
         title="Backoffice Brief"
         subtitle={
-          items.length
-            ? `${items.length} item(s) need attention · ${high} high · ${scanned} workflows scanned`
-            : `Nothing needs attention · ${scanned} workflows scanned`
+          items.length ? (
+            <>
+              <b className="font-semibold text-ink nums">{items.length}</b> items need attention ·{" "}
+              <b className="font-semibold text-ink nums">{high}</b> high ·{" "}
+              <b className="font-semibold text-ink nums">{scanned}</b> workflows scanned
+            </>
+          ) : (
+            <>
+              Nothing needs attention · <b className="font-semibold text-ink nums">{scanned}</b>{" "}
+              workflows scanned
+            </>
+          )
         }
         actions={<BriefActions />}
       />
-
-      {items.length === 0 ? (
-        <div className="rounded-xl border border-line bg-panel-2 p-10 text-center text-sm text-muted">
-          All clear. No risky changes, ownership gaps, or shared-resource risks right now.
-        </div>
-      ) : (
-        <div className="flex max-w-3xl flex-col gap-3">
-          {items.map((item) => (
-            <BriefCard key={item.key} item={item} />
-          ))}
-        </div>
-      )}
+      <BriefBoard items={items} scanned={scanned} />
     </div>
   );
 }
