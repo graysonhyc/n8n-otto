@@ -1,5 +1,5 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { z } from "zod";
 import type { N8nWorkflow } from "@/lib/n8n/types";
 import { classify } from "@/lib/derive/classify";
@@ -24,7 +24,7 @@ const Schema = z.object({
   runbook: z.array(z.string()),
 });
 
-const MODEL = "claude-sonnet-5";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4.1";
 
 // Cache by workflow id — enrichment is stable between edits within a session.
 const cache = new Map<string, Enrichment>();
@@ -58,7 +58,7 @@ export async function enrich(workflow: N8nWorkflow): Promise<Enrichment> {
   const cached = cache.get(workflow.id);
   if (cached) return cached;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     const h = heuristic(workflow);
     cache.set(workflow.id, h);
@@ -66,20 +66,18 @@ export async function enrich(workflow: N8nWorkflow): Promise<Enrichment> {
   }
 
   try {
-    const client = new Anthropic({ apiKey });
+    const client = new OpenAI({ apiKey });
     const c = classify(workflow);
-    const res = await client.messages.create({
+    const res = await client.chat.completions.create({
       model: MODEL,
-      max_tokens: 700,
-      system: ENRICH_SYSTEM,
-      messages: [{ role: "user", content: workflowDigest(workflow, c) }],
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: ENRICH_SYSTEM },
+        { role: "user", content: workflowDigest(workflow, c) },
+      ],
     });
-    const text = res.content
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-      .trim();
-    const json = JSON.parse(text.replace(/^```json\n?|\n?```$/g, ""));
-    const parsed = Schema.parse(json);
+    const text = res.choices[0]?.message?.content ?? "{}";
+    const parsed = Schema.parse(JSON.parse(text));
     const enrichment: Enrichment = { ...parsed, source: "ai" };
     cache.set(workflow.id, enrichment);
     return enrichment;

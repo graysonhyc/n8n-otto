@@ -24,7 +24,7 @@ n8n REST API ─▶ derive (classify, edges, health) ─▶ Claude enrich ─▶
   and relationship edges (Tier A exact, Tier B/C heuristic).
 - **Change detection.** Each sync snapshots change-relevant fields and diffs
   against the last snapshot to surface prompt/model/tool/trigger changes.
-- **AI recommends, humans confirm.** Claude drafts business purpose, owner
+- **AI recommends, humans confirm.** OpenAI drafts business purpose, owner
   inference, change-risk and runbooks; every AI field is labelled and editable.
 
 ## Quickstart
@@ -37,7 +37,7 @@ pnpm dev                          # http://localhost:3000  → redirects to /bri
 ```
 
 Runs on demo data out of the box. Add `N8N_BASE_URL` + `N8N_API_KEY` to read a
-real instance; add `ANTHROPIC_API_KEY` for AI summaries; add the `SLACK_*` vars
+real instance; add `OPENAI_API_KEY` for AI summaries; add the `SLACK_*` vars
 to enable the Slack app.
 
 ## Slack app setup

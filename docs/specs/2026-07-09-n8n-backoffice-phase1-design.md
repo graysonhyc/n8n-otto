@@ -40,7 +40,7 @@ Standalone **Next.js (App Router) full-stack** app, deployed to Vercel.
 Browser (6-ish screens, n8n dark + coral theme)
         │
 Next.js route handlers  ──►  n8n REST API  (workflows, executions, credentials, projects, users)
-        │             ──►  Anthropic (Claude)   — enrichment
+        │             ──►  OpenAI                — enrichment
         │             ──►  Slack Web API         — list channels, post messages
         │             ◄──  Slack interactivity/events — button actions, verification
         ▼
@@ -49,7 +49,7 @@ Backoffice store (owners, routing config, manual links, confirmed change state)
 
 - **Store:** lightweight persisted store (Postgres/SQLite or a hosted KV) for data n8n doesn't own: confirmed owners, team→channel routing, manual workflow links, dismissed/acknowledged Brief items, last-synced workflow snapshots (for diffing).
 - **Sync:** derive on load + manual refresh + periodic poll. The graph/registry is a pure function of current n8n data + the store, so sync = re-fetch + re-derive + diff.
-- **Secrets:** `.env.local` — `N8N_BASE_URL`, `N8N_API_KEY`, `ANTHROPIC_API_KEY`, `SLACK_CLIENT_ID/SECRET/SIGNING_SECRET`. Never in the client bundle; all provider calls are server-side.
+- **Secrets:** `.env.local` — `N8N_BASE_URL`, `N8N_API_KEY`, `OPENAI_API_KEY`, `SLACK_CLIENT_ID/SECRET/SIGNING_SECRET`. Never in the client bundle; all provider calls are server-side.
 
 ## 4. Data derivation (from real n8n)
 
@@ -111,7 +111,7 @@ Sections: Summary (business purpose, input, output, AI behaviour) · Ownership (
   4. **Daily Brief** → master `#n8n-backoffice` + per-team slices.
 - **Signature verification** on all inbound Slack requests.
 
-## 8. AI layer (Claude)
+## 8. AI layer (OpenAI)
 
 Server-side only. Uses: summarise business purpose/input/output; explain agent behaviour; infer owner + reasoning; classify change risk (summarise→decide is high); translate technical error → business impact; generate runbook; blast-radius in business language.
 

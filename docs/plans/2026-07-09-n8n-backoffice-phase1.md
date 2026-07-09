@@ -4,9 +4,9 @@
 
 **Goal:** Build a standalone Next.js app that reads a real n8n instance and presents a business-readable Registry, per-workflow Detail (with auto + manual relationships), a proactive Brief, and a real Slack app that routes alerts/approvals/the daily brief to the owner's Slack channel.
 
-**Architecture:** Next.js (App Router) full-stack. Server route handlers + server actions call the n8n REST API, Anthropic (Claude), and the Slack Web API. A Prisma-backed store holds data n8n doesn't own (confirmed owners, team→channel routing, manual workflow links, workflow snapshots for diffing, Slack tokens, acknowledged/dismissed items). All provider calls are server-side; the browser never sees a secret. Deployed to Vercel; demo Slack workspace with seeded channels.
+**Architecture:** Next.js (App Router) full-stack. Server route handlers + server actions call the n8n REST API, OpenAI, and the Slack Web API. A Prisma-backed store holds data n8n doesn't own (confirmed owners, team→channel routing, manual workflow links, workflow snapshots for diffing, Slack tokens, acknowledged/dismissed items). All provider calls are server-side; the browser never sees a secret. Deployed to Vercel; demo Slack workspace with seeded channels.
 
-**Tech Stack:** Next.js 16 (App Router, RSC) · TypeScript · Tailwind v4 · Prisma (SQLite dev / Postgres prod) · Anthropic SDK · Slack Web API + signed interactivity · Vitest for unit tests.
+**Tech Stack:** Next.js 16 (App Router, RSC) · TypeScript · Tailwind v4 · Prisma (SQLite dev / Postgres prod) · OpenAI SDK · Slack Web API + signed interactivity · Vitest for unit tests.
 
 **Spec:** `docs/specs/2026-07-09-n8n-backoffice-phase1-design.md`
 
@@ -58,7 +58,7 @@ lib/
   derive/registry.ts            # compose derived registry item
   diff/snapshot.ts               # snapshot + diff for change detection
   brief/build.ts                 # rules → brief items
-  ai/enrich.ts                   # Claude: purpose, owner, risk, runbook
+  ai/enrich.ts                   # OpenAI: purpose, owner, risk, runbook
   ai/prompts.ts
   slack/verify.ts                # signature verification
   slack/blocks.ts                # Block Kit builders (4 message types)
@@ -157,8 +157,8 @@ Schema models: `OwnerAssignment { workflowId, team, slackChannelId, slackChannel
 
 ### Task 2.5: AI enrichment
 **Files:** `lib/ai/{enrich,prompts}.ts`, wire into Detail + Registry (cached to store).
-- [ ] `enrich(workflow)` → `{ businessPurpose, input, output, ownerGuess+reasoning, runbook }` via Anthropic SDK (`claude-opus-4-8` or `claude-sonnet-5`), server-side, results cached. Prompts in `prompts.ts`. Degrade gracefully if `ANTHROPIC_API_KEY` unset (show "AI summary unavailable").
-- [ ] Verify with key set on one workflow. Commit `feat: Claude enrichment`.
+- [ ] `enrich(workflow)` → `{ businessPurpose, input, output, ownerGuess+reasoning, runbook }` via OpenAI SDK (`gpt-4.1`), server-side, results cached. Prompts in `prompts.ts`. Degrade gracefully if `OPENAI_API_KEY` unset (show "AI summary unavailable").
+- [ ] Verify with key set on one workflow. Commit `feat: OpenAI enrichment`.
 
 ---
 
@@ -225,7 +225,7 @@ Schema models: `OwnerAssignment { workflowId, team, slackChannelId, slackChannel
 
 ### Task 5.1: Env + config docs
 **Files:** `.env.example`, `README.md`.
-- [ ] Document `N8N_BASE_URL`, `N8N_API_KEY`, `ANTHROPIC_API_KEY`, `SLACK_*`, `DATABASE_URL`. Setup steps.
+- [ ] Document `N8N_BASE_URL`, `N8N_API_KEY`, `OPENAI_API_KEY`, `SLACK_*`, `DATABASE_URL`. Setup steps.
 - [ ] Commit `docs: env + setup`.
 
 ### Task 5.2: Slack demo workspace + channels
@@ -247,7 +247,7 @@ Schema models: `OwnerAssignment { workflowId, team, slackChannelId, slackChannel
 
 ## Open dependencies (need from user before Chunk 6/5.3)
 - n8n `N8N_BASE_URL` + `N8N_API_KEY` (populated instance).
-- `ANTHROPIC_API_KEY`.
+- `OPENAI_API_KEY`.
 - Slack app: `SLACK_CLIENT_ID/SECRET/SIGNING_SECRET` + a workspace to install into.
 
 ## Testing summary
