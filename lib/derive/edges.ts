@@ -96,6 +96,22 @@ function credentialUsage(workflows: N8nWorkflow[]): Map<string, { name: string; 
   return usage;
 }
 
+export interface CredentialGroup {
+  credentialId: string;
+  credentialName: string;
+  workflowIds: string[];
+}
+
+/** All credentials with the list of workflows that use them (for shared-resource risk). */
+export function credentialGroups(workflows: N8nWorkflow[]): CredentialGroup[] {
+  const usage = credentialUsage(workflows);
+  return [...usage.entries()].map(([credentialId, { name, ids }]) => ({
+    credentialId,
+    credentialName: name,
+    workflowIds: [...ids].sort(),
+  }));
+}
+
 export function sharedCredentialEdges(workflows: N8nWorkflow[]): SharedCredentialEdge[] {
   const usage = credentialUsage(workflows);
   const edges: SharedCredentialEdge[] = [];
