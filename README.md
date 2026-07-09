@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# n8n Backoffice
 
-## Getting Started
+The operational control room for enterprise automations and AI agents. Reads a
+real n8n instance and turns raw workflows into a business-readable **Registry**,
+per-workflow **Detail** (with auto + manual relationships), a proactive
+**Brief**, and a real **Slack app** that routes alerts/approvals/the daily brief
+to each workflow owner's Slack channel.
 
-First, run the development server:
+> Complements n8n Insights. Insights tells you *how workflows perform*; Backoffice
+> tells you *what they mean, who owns them, what they depend on, and what to do
+> when something changes.*
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## How it works
+
+```
+n8n REST API ─▶ derive (classify, edges, health) ─▶ Claude enrich ─▶ store ─▶ 6 screens + Slack
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Real data.** Workflows, executions, credentials are read live via `/api/v1`.
+  With no `N8N_*` env set, the app runs on bundled demo fixtures (the Refund
+  Review Agent scenario) so everything is explorable immediately.
+- **Derivation.** Node/connection parsing yields workflow type (deterministic /
+  AI-assisted / AI-agent-with-tools / human-in-loop), systems touched, trigger,
+  and relationship edges (Tier A exact, Tier B/C heuristic).
+- **Change detection.** Each sync snapshots change-relevant fields and diffs
+  against the last snapshot to surface prompt/model/tool/trigger changes.
+- **AI recommends, humans confirm.** Claude drafts business purpose, owner
+  inference, change-risk and runbooks; every AI field is labelled and editable.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quickstart
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm install
+cp .env.example .env.local        # fill in what you have; all are optional to start
+pnpm prisma migrate dev           # creates the local SQLite store
+pnpm dev                          # http://localhost:3000  → redirects to /brief
+```
 
-## Learn More
+Runs on demo data out of the box. Add `N8N_BASE_URL` + `N8N_API_KEY` to read a
+real instance; add `ANTHROPIC_API_KEY` for AI summaries; add the `SLACK_*` vars
+to enable the Slack app.
 
-To learn more about Next.js, take a look at the following resources:
+## Slack app setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create a Slack app (from scratch). Add **Bot Token Scopes**: `channels:read`,
+   `groups:read`, `chat:write`, `commands`.
+2. **OAuth redirect URL:** `${APP_BASE_URL}/api/slack/oauth`
+3. **Interactivity request URL:** `${APP_BASE_URL}/api/slack/interactivity`
+4. Copy Client ID / Client Secret / Signing Secret into `.env.local`.
+5. Visit `/api/slack/install` (or the "Connect Slack" link in the Registry owner
+   picker) to install into your workspace.
+6. Seed the demo channels + routing: `pnpm setup:demo`
+   (creates `#n8n-backoffice`, `#support-ops`, `#revops`, … and maps the anchor
+   workflows to them). The bot must be a member of a channel to post there.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy (Vercel)
 
-## Deploy on Vercel
+1. Switch `prisma/schema.prisma` datasource provider to `postgresql` and set
+   `DATABASE_URL` to a Postgres URL (Neon/Supabase). Run `pnpm prisma migrate deploy`.
+2. Set all env vars in the Vercel project; set `APP_BASE_URL` to the deploy URL.
+3. Update the Slack app's OAuth + Interactivity URLs to the deploy domain and
+   reinstall.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Tests
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm test        # vitest — classify, edges, registry risk, snapshot/diff, brief rules, slack verify + routing
+```
+
+## Screens
+
+- **Brief** — ranked "needs attention now" cards; one click sends them to Slack.
+- **Registry** — inventory with filters; inline owner assignment from live Slack channels.
+- **Detail** — summary, ownership + reasoning, relationships (auto + manual Jira-style links), AI behaviour, runbook.
+
+Responsibility Center, Change Memory, and the full Dependency Map + SOP overlay
+are planned for later phases.
