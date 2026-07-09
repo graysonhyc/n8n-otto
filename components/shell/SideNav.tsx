@@ -63,9 +63,22 @@ export function SideNav() {
   const pathname = usePathname();
   return (
     <aside className="border-r border-line bg-panel px-3 py-5">
-      <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
-        Backoffice
-      </div>
+      <Link
+        href="/brief"
+        className="mb-5 flex items-center gap-2.5 px-2 py-1"
+        aria-label="n8n Backoffice — home"
+      >
+        <img
+          src="/n8n.webp"
+          alt=""
+          width={28}
+          height={28}
+          className="rounded-[7px] shadow-sm ring-1 ring-line-2"
+        />
+        <span className="text-[15px] font-semibold tracking-tight text-ink">
+          n8n <span className="text-muted">Backoffice</span>
+        </span>
+      </Link>
       <div className="flex flex-col gap-1">
         {BACKOFFICE.map((item) => (
           <Row
