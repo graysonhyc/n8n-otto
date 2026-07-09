@@ -19,7 +19,8 @@ display_information:
 
 features:
   bot_user:
-    display_name: n8n Backoffice
+    # display_name allows only a-z 0-9 - _ .  (no spaces, no uppercase)
+    display_name: n8n-backoffice
     always_online: true
 
 oauth_config:
