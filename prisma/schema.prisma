@@ -1,0 +1,61 @@
+// Backoffice store — only data n8n does NOT own.
+// Everything else is derived live from the n8n API.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Confirmed / inferred ownership + Slack routing target per workflow.
+model OwnerAssignment {
+  workflowId         String  @id
+  team               String
+  slackChannelId     String?
+  slackChannelName   String?
+  escalationChannelId String?
+  confirmed          Boolean @default(false)
+  reasoning          String?
+  source             String  @default("inferred") // "inferred" | "confirmed"
+  updatedAt          DateTime @updatedAt
+}
+
+/// Manual (Jira-style) relationship between two workflows. Bidirectional at read time.
+model WorkflowLink {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  relation  String // depends-on | triggers | duplicate-of | part-of-process | shares-data-with
+  source    String   @default("manual")
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId, relation])
+  @@index([fromId])
+  @@index([toId])
+}
+
+/// Latest snapshot of change-relevant fields, used to diff on the next sync.
+model WorkflowSnapshot {
+  workflowId String   @id
+  hash       String
+  json       String
+  capturedAt DateTime @updatedAt
+}
+
+/// Slack workspace install (bot token).
+model SlackInstall {
+  teamId      String   @id
+  botToken    String
+  botUserId   String
+  installedAt DateTime @default(now())
+}
+
+/// Dismissed / acknowledged state for brief items.
+model BriefItemState {
+  key       String   @id
+  status    String // dismissed | acknowledged
+  updatedAt DateTime @updatedAt
+}

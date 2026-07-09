@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  n8n Backoffice theme — dark canvas + n8n coral accent.
+  Semantic colours (danger/warn/ok) are separate from the brand accent.
+  AI-related things are violet; change-risk is orange.
+*/
+@theme {
+  --color-canvas: #0d0d11;
+  --color-panel: #16161c;
+  --color-panel-2: #1d1d25;
+  --color-panel-3: #22222b;
+  --color-line: #2a2a34;
+  --color-line-2: #353542;
+
+  --color-ink: #e9e9ee;
+  --color-muted: #9a9aa6;
+  --color-faint: #6c6c78;
+
+  --color-accent: #ea4b71;
+  --color-accent-ink: #ffffff;
+  --color-accent-dim: #3a1f2a;
+
+  --color-danger: #f0483e;
+  --color-warn: #f6a723;
+  --color-ok: #28c07f;
+  --color-ai: #9a7bf0;
+  --color-info: #5b8def;
+  --color-change: #ff8a4c;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html { height: 100%; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #1a1220 0%, transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, #101820 0%, transparent 55%),
+    var(--color-canvas);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #2a2a34; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
