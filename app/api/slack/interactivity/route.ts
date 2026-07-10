@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifySlackRequest } from "@/lib/slack/verify";
-import { setBriefState, setOwner } from "@/lib/backoffice/store";
+import { assignMember, createSop, setBriefState, setOwner, setSuggestionState } from "@/lib/backoffice/store";
 import { linearFromEnv } from "@/lib/linear/client";
 import { buildAgentContext } from "@/lib/agent/load";
 import { blastRadius } from "@/lib/derive/blast";
@@ -56,6 +56,25 @@ export async function POST(request: Request) {
       break;
     case "reject_owner":
       text = "Noted — owner suggestion rejected.";
+      break;
+    case "create_sop_from_suggestion":
+      if (value.memberIds) {
+        const ids = JSON.parse(value.memberIds) as string[];
+        await createSop(value.name || `Process (${ids.length} workflows)`, ids);
+        if (value.suggestionId) await setSuggestionState(value.suggestionId, "notified");
+      }
+      text = "✓ SOP created in Backoffice.";
+      break;
+    case "add_to_sop_suggestion":
+      if (value.memberIds && value.targetSopId) {
+        for (const id of JSON.parse(value.memberIds) as string[]) await assignMember(id, value.targetSopId);
+        if (value.suggestionId) await setSuggestionState(value.suggestionId, "notified");
+      }
+      text = "✓ Workflows added to the SOP.";
+      break;
+    case "dismiss_suggestion":
+      if (value.suggestionId) await setSuggestionState(value.suggestionId, "dismissed");
+      text = "Suggestion dismissed.";
       break;
     case "open_in_n8n": {
       const url = value.workflowId ? workflowUrlFromEnv(value.workflowId) : null;

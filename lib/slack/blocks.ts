@@ -1,6 +1,7 @@
 import type { KnownBlock } from "@slack/web-api";
 import type { BriefItem, Severity } from "@/lib/brief/build";
 import type { DailyBrief } from "@/lib/brief/daily";
+import type { SopSuggestion } from "@/lib/derive/suggestions";
 
 const EMOJI: Record<Severity, string> = { high: "🔴", medium: "🟠", low: "🟡" };
 
@@ -85,6 +86,41 @@ export function ownershipCheckBlocks(input: {
     {
       type: "context",
       elements: [{ type: "mrkdwn", text: "Confirmation writes back to the Backoffice registry." }],
+    },
+  ];
+}
+
+// An SOP suggestion as a Slack card: the team can create the SOP (or add the
+// missing workflows to an existing one) or dismiss it, all without leaving Slack.
+// `names` maps workflow id → name for a readable member list; ids fall back to
+// themselves. `memberIds` is JSON-encoded inside `value` because Slack action
+// values are flat strings on the way back through the interactivity handler.
+export function suggestionBlocks(s: SopSuggestion, names?: Map<string, string>): KnownBlock[] {
+  const autoName = `Process (${s.memberIds.length} workflows)`;
+  const value = JSON.stringify({
+    suggestionId: s.id,
+    memberIds: JSON.stringify(s.memberIds),
+    kind: s.kind,
+    targetSopId: s.targetSopId ?? "",
+    name: autoName,
+  });
+  const memberList = s.memberIds.map((id) => names?.get(id) ?? id).join(", ");
+  const headline =
+    s.kind === "add-to-sop"
+      ? `🧩 *${s.memberIds.length} workflow${s.memberIds.length === 1 ? "" : "s"}* that ${s.reason} belong with *${s.targetSopName}*`
+      : `🧩 *${s.memberIds.length} workflows* ${s.reason} — looks like one process`;
+
+  const accept =
+    s.kind === "add-to-sop"
+      ? button(`Add to ${s.targetSopName}`, "add_to_sop_suggestion", value, "primary")
+      : button("Create SOP", "create_sop_from_suggestion", value, "primary");
+
+  return [
+    { type: "section", text: { type: "mrkdwn", text: headline } },
+    { type: "context", elements: [{ type: "mrkdwn", text: `Workflows: ${memberList}` }] },
+    {
+      type: "actions",
+      elements: [accept, button("Dismiss", "dismiss_suggestion", value, "danger")],
     },
   ];
 }
