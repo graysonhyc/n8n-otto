@@ -1,6 +1,7 @@
 import "server-only";
 import { loadInstance } from "./source";
-import { getAllOwners, getSop, listSops } from "@/lib/backoffice/store";
+import { getAllOwners, getSop, getSuggestionStates, listSops } from "@/lib/backoffice/store";
+import { buildClusters, classifySuggestions, type SopSuggestion } from "@/lib/derive/suggestions";
 import {
   composeDeterministic,
   type WorkflowGraph,
@@ -81,6 +82,27 @@ export async function loadGroups(): Promise<GroupsView> {
     unassignedCount: workflows.length - assignedCount,
     live,
   };
+}
+
+export interface SuggestionsView {
+  suggestions: SopSuggestion[];
+}
+
+/**
+ * Live SOP suggestions: deterministic clusters (call edges + shared data
+ * sources) that aren't yet an SOP, minus any the team has dismissed.
+ */
+export async function loadSuggestions(): Promise<SuggestionsView> {
+  const [{ workflows }, sops, states] = await Promise.all([
+    loadInstance(),
+    listSops(),
+    getSuggestionStates(),
+  ]);
+  const sopByWorkflow = new Map<string, { id: string; name: string }>();
+  for (const s of sops) for (const m of s.members) sopByWorkflow.set(m.workflowId, { id: s.id, name: s.name });
+  const dismissed = new Set([...states].filter(([, v]) => v === "dismissed").map(([k]) => k));
+  const suggestions = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed });
+  return { suggestions };
 }
 
 /** A workflow candidate for adding to an SOP, annotated with its current SOP. */
