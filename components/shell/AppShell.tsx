@@ -7,10 +7,12 @@ import { ToastProvider } from "@/components/ui/Toast";
 // App frame: nav rail · (command bar + scrolling content). Toasts and the
 // command palette live at the top level so any screen can reach them.
 export function AppShell({ children }: { children: ReactNode }) {
+  // Server-only env, read here and threaded into the client nav for deep-links.
+  const n8nBaseUrl = process.env.N8N_BASE_URL;
   return (
     <ToastProvider>
       <div className="grid h-screen grid-cols-[232px_1fr] overflow-hidden">
-        <SideNav />
+        <SideNav n8nBaseUrl={n8nBaseUrl} />
         <div className="flex flex-col overflow-hidden">
           <TopBar />
           <main className="flex-1 overflow-auto">{children}</main>

@@ -1,6 +1,7 @@
 import type { N8nExecution, N8nWorkflow, WorkflowType, TriggerKind } from "@/lib/n8n/types";
 import type { Owner } from "@/lib/backoffice/types";
 import { classify } from "./classify";
+import { suggestOwner, type OwnerSuggestion } from "./owner";
 import { unreachableNodes } from "./structure";
 
 export interface Health {
@@ -29,6 +30,8 @@ export interface RegistryItem {
   active: boolean;
   tags: string[];
   owner: Owner | null;
+  // Suggested owning team (classifier), present only while unassigned + confident.
+  suggestedOwner: OwnerSuggestion | null;
   criticality: "High" | "Medium" | "Low";
   health: Health;
   risk: RiskAssessment;
@@ -142,6 +145,8 @@ export function composeRegistryItem(
     active: workflow.active,
     tags: (workflow.tags ?? []).map((t) => t.name),
     owner,
+    // Only suggest when nobody's assigned — a confirmed owner wins.
+    suggestedOwner: owner ? null : suggestOwner(workflow),
     criticality,
     health,
     risk: assessRisk({

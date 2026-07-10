@@ -8,6 +8,10 @@ const Body = z.object({
   slackChannelId: z.string().nullable().optional(),
   slackChannelName: z.string().nullable().optional(),
   escalationChannelId: z.string().nullable().optional(),
+  reasoning: z.string().nullable().optional(),
+  // "inferred" when applying a classifier suggestion; defaults to "confirmed"
+  // for a manual assignment. Either way a human clicked, so confirmed is true.
+  source: z.enum(["inferred", "confirmed"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -15,6 +19,10 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const owner = await setOwner({ ...parsed.data, source: "confirmed", confirmed: true });
+  const owner = await setOwner({
+    ...parsed.data,
+    source: parsed.data.source ?? "confirmed",
+    confirmed: true,
+  });
   return NextResponse.json({ owner });
 }

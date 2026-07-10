@@ -1,7 +1,7 @@
 /**
- * Demo setup: seeds team → Slack-channel routing for the anchor workflows.
- * If a Slack workspace is connected, it also creates the demo channels and
- * captures their IDs so alerts route live.
+ * Demo setup: ensures the demo Slack channels exist (so the owner picker and
+ * alert routing have targets). Owners are intentionally NOT seeded — assign
+ * them yourself from the Registry so nothing is pre-classified for you.
  *
  * Run:  pnpm setup:demo
  *
@@ -22,15 +22,6 @@ const CHANNELS = [
   "finance",
   "cs-alerts",
 ];
-
-// workflowId → { team, channel name }
-const ROUTING: Record<string, { team: string; channel: string }> = {
-  wf_refund_review_agent: { team: "Support Ops", channel: "support-ops" },
-  wf_customer_onboarding: { team: "RevOps", channel: "revops" },
-  wf_welcome_email_agent: { team: "RevOps", channel: "revops" },
-  wf_lead_routing: { team: "Sales Ops", channel: "sales-ops" },
-  wf_pto_approval_bot: { team: "People Ops", channel: "people-ops" },
-};
 
 async function ensureChannels(client: WebClient): Promise<Map<string, string>> {
   const byName = new Map<string, string>();
@@ -69,30 +60,12 @@ async function main() {
     console.log("Slack connected — ensuring demo channels…");
     channelIds = await ensureChannels(new WebClient(install.botToken));
   } else {
-    console.log("Slack not connected — seeding team labels only (no channel routing).");
+    console.log("Slack not connected — skipping channel creation.");
   }
 
-  for (const [workflowId, { team, channel }] of Object.entries(ROUTING)) {
-    const slackChannelId = channelIds.get(channel) ?? null;
-    await prisma.ownerAssignment.upsert({
-      where: { workflowId },
-      create: {
-        workflowId,
-        team,
-        slackChannelId,
-        slackChannelName: slackChannelId ? `#${channel}` : null,
-        confirmed: true,
-        source: "confirmed",
-      },
-      update: {
-        team,
-        slackChannelId,
-        slackChannelName: slackChannelId ? `#${channel}` : null,
-      },
-    });
-    console.log(`  ${workflowId} → ${team}${slackChannelId ? ` (#${channel})` : ""}`);
-  }
-
+  console.log(
+    "Owners left unassigned — assign them yourself from the Registry.",
+  );
   console.log("Done.");
   await prisma.$disconnect();
 }
