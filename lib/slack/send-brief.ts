@@ -1,39 +1,45 @@
 import "server-only";
-import { getAllOwners, getSlackInstall } from "@/lib/backoffice/store";
-import { loadDailyBrief } from "@/lib/data/brief";
-import { getMasterChannelId, postBlocks } from "@/lib/slack/post";
-import { resolveRouting } from "@/lib/slack/route";
-import { dailyBriefBlocks, briefItemBlocks } from "@/lib/slack/blocks";
+import { getSlackInstall } from "@/lib/backoffice/store";
+import { loadChannelBriefs } from "@/lib/data/brief";
+import { postBlocks } from "@/lib/slack/post";
+import { briefItemBlocks, briefFooterBlock } from "@/lib/slack/blocks";
+import { narrateBrief } from "@/lib/brief/narrate";
+import { openaiFromEnv } from "@/lib/agent/openai";
 
 export type SendBriefResult =
   | { ok: false; status: number; error: string }
-  | { ok: true; channel: string; posted: number; routed: number };
+  | { ok: true; channels: number; posted: number };
 
-// Posts the daily team brief (Yesterday recap · Today look-ahead · Explore next)
-// to #n8n-backoffice, then routes each attention item to its owner's channel,
-// falling back to the master channel when a workflow is unassigned. Shared by
-// the manual "Send to Slack" action and the 09:00 CEST cron.
+// Posts one Otto-narrated daily brief per Slack channel, scoped to the workflows
+// owned in that channel, then the channel's attention items as interactive cards.
+// Workflows with no channel are skipped; there is no master channel. Shared by the
+// manual "Send to Slack" action and the 09:00 CEST cron.
 export async function sendDailyBrief(): Promise<SendBriefResult> {
   const install = await getSlackInstall();
   if (!install) return { ok: false, status: 400, error: "Slack not connected" };
 
-  const master = await getMasterChannelId(install.botToken);
-  if (!master) return { ok: false, status: 400, error: "Could not find #n8n-backoffice channel" };
+  const openai = openaiFromEnv();
+  if (!openai) return { ok: false, status: 400, error: "OPENAI_API_KEY not set — Otto can't write the brief" };
 
-  const [{ daily, attention }, owners] = await Promise.all([loadDailyBrief(), getAllOwners()]);
+  const { channels } = await loadChannelBriefs();
 
-  await postBlocks(install.botToken, master, dailyBriefBlocks(daily), "n8n Backoffice — Daily Brief");
-
-  let routed = 0;
-  for (const item of attention) {
-    if (!item.workflowId) continue;
-    const routing = resolveRouting(owners.get(item.workflowId) ?? null, master);
-    const note = routing.routedByOwner
-      ? `↳ routed to ${routing.channelName ?? "owner channel"} because ${item.suggestedOwner} owns this`
-      : "↳ no owner assigned — posted to #n8n-backoffice";
-    await postBlocks(install.botToken, routing.channelId, briefItemBlocks(item, note), item.title);
-    routed++;
+  let posted = 0;
+  for (const ch of channels) {
+    const prose = await narrateBrief({ daily: ch.daily, channelName: ch.channelName, client: openai });
+    await postBlocks(
+      install.botToken,
+      ch.channelId,
+      [
+        { type: "section", text: { type: "mrkdwn", text: prose } },
+        briefFooterBlock(ch.daily),
+      ],
+      "n8n Otto — Daily Brief",
+    );
+    for (const item of ch.attention) {
+      await postBlocks(install.botToken, ch.channelId, briefItemBlocks(item), item.title);
+      posted++;
+    }
   }
 
-  return { ok: true, channel: "#n8n-backoffice", posted: attention.length, routed };
+  return { ok: true, channels: channels.length, posted };
 }

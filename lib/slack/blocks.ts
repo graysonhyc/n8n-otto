@@ -1,6 +1,6 @@
 import type { KnownBlock } from "@slack/web-api";
 import type { BriefItem, Severity } from "@/lib/brief/build";
-import type { DailyBrief, WorkflowStat } from "@/lib/brief/daily";
+import type { DailyBrief } from "@/lib/brief/daily";
 
 const EMOJI: Record<Severity, string> = { high: "🔴", medium: "🟠", low: "🟡" };
 
@@ -97,86 +97,17 @@ function fmtMinutes(min: number): string {
   return rem ? `${h}h ${rem}m` : `${h}h`;
 }
 
-function fmtDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s % 1 === 0 ? s : s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  return `${m}m ${Math.round(s % 60)}s`;
-}
-
-function statLine(s: WorkflowStat): string {
-  return `${s.name} ${s.runs}`;
-}
-
-function section(text: string): KnownBlock {
-  return { type: "section", text: { type: "mrkdwn", text } };
-}
-
-const divider: KnownBlock = { type: "divider" };
-
-// The daily team brief: yesterday's recap, today's look-ahead, and what to
-// explore next. Posted once each morning to the master channel; the individual
-// attention items are still routed to owner channels separately.
-export function dailyBriefBlocks(daily: DailyBrief): KnownBlock[] {
-  const { yesterday: y, today, exploreNext } = daily;
+// Deterministic ground-truth footer posted under Otto's prose so the exact
+// numbers are always verifiable even if the narrative drifts.
+export function briefFooterBlock(daily: DailyBrief): KnownBlock {
+  const y = daily.yesterday;
   const successPct = y.runs ? Math.round((y.successes / y.runs) * 100) : 100;
-
-  const blocks: KnownBlock[] = [
-    {
-      type: "header",
-      text: { type: "plain_text", text: "📋 n8n Backoffice — Daily Brief", emoji: true },
-    },
-  ];
-
-  // --- Yesterday --------------------------------------------------------
-  if (y.runs === 0) {
-    blocks.push(section(`*📊 Yesterday (${y.dateLabel})*\nNo production runs.`));
-  } else {
-    const savedNote = y.timeSavedEstimated ? " _(est)_" : "";
-    const recap = [
-      `*📊 Yesterday (${y.dateLabel})*`,
-      `*${y.runs}* runs · *${successPct}%* success · *${y.errors}* errors (${y.errorPct}%)`,
-      `*${y.tasksSolved}* tasks solved · *~${fmtMinutes(y.timeSavedMinutes)}* saved${savedNote} · avg ${fmtDuration(y.avgDurationMs)}/run · ${y.activeWorkflows} active`,
-    ];
-    if (y.topRunners.length) recap.push(`Top: ${y.topRunners.map(statLine).join(" · ")}`);
-    if (y.topErrorSources.length) {
-      recap.push(`⚠️ Errors: ${y.topErrorSources.map((s) => `${s.name} (${s.errors})`).join(" · ")}`);
-    }
-    blocks.push(section(recap.join("\n")));
-  }
-
-  // --- Today ------------------------------------------------------------
-  blocks.push(divider);
-  const todayLines = ["*📅 Today*"];
-  todayLines.push(
-    today.scheduled.length
-      ? `*Scheduled:* ${today.scheduled.map((s) => s.name).join(" · ")}`
-      : "*Scheduled:* none",
-  );
-  todayLines.push(
-    today.changes.length
-      ? `*Changes:* ${today.changes.map((c) => `${c.name} (${c.detail})`).join(" · ")}`
-      : "*Changes:* none detected",
-  );
-  const high = today.attention.filter((a) => a.severity === "high").length;
-  todayLines.push(
-    today.attention.length
-      ? `*Needs attention:* ${today.attention.length} item(s), ${high} high — routed to owner channels below`
-      : "*Needs attention:* all clear",
-  );
-  blocks.push(section(todayLines.join("\n")));
-
-  // --- Explore next -----------------------------------------------------
-  if (exploreNext.length) {
-    blocks.push(divider);
-    const lines = ["*🔭 Explore next*", ...exploreNext.map((e) => `• *${e.title}*${e.detail ? `\n   ${e.detail}` : ""}`)];
-    blocks.push(section(lines.join("\n")));
-  }
-
-  blocks.push({
-    type: "context",
-    elements: [{ type: "mrkdwn", text: "Posted daily at 09:00 CEST · attention items routed per owning team" }],
-  });
-  return blocks;
+  const savedNote = y.timeSavedEstimated ? " (est)" : "";
+  const line =
+    y.runs === 0
+      ? `No production runs yesterday (${y.dateLabel})`
+      : `${y.dateLabel}: ${y.runs} runs · ${successPct}% success · ${y.errors} errors · ~${fmtMinutes(
+          y.timeSavedMinutes,
+        )} saved${savedNote} · ${y.activeWorkflows} active`;
+  return { type: "context", elements: [{ type: "mrkdwn", text: `📊 ${line}` }] };
 }

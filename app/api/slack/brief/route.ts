@@ -7,5 +7,5 @@ export async function POST() {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
-  return NextResponse.json({ channel: result.channel, posted: result.posted, routed: result.routed });
+  return NextResponse.json({ channels: result.channels, posted: result.posted });
 }

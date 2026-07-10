@@ -8,6 +8,7 @@ import { composeGraph } from "@/lib/derive/graph";
 import { blastRadius, type BlastRadius } from "@/lib/derive/blast";
 import { buildBrief, type BriefItem } from "@/lib/brief/build";
 import { computeDailyBrief, type DailyBrief } from "@/lib/brief/daily";
+import { groupBriefsByChannel, type ChannelBrief } from "@/lib/brief/channels";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner, ManualLink } from "@/lib/backoffice/types";
 
@@ -94,4 +95,38 @@ export async function loadDailyBrief(): Promise<DailyBriefView> {
   const daily = computeDailyBrief({ items, executions, changes, attention, sharedCredentials, now });
 
   return { daily, attention, live, scanned };
+}
+
+export interface ChannelBriefsView {
+  channels: ChannelBrief[];
+  live: boolean;
+  scanned: number;
+}
+
+// One Otto-narrated brief per Slack channel: the estate is grouped by each
+// workflow's owner channel (workflows with no channel are skipped), and every
+// bucket gets its own scoped Yesterday/Today/Explore brief plus its attention
+// items. Shared by the manual "Send to Slack" action and the morning cron.
+export async function loadChannelBriefs(): Promise<ChannelBriefsView> {
+  const [{ workflows, executions, live }, owners, states, links, groupNames, { changes, scanned }] =
+    await Promise.all([
+      loadInstance(),
+      getAllOwners(),
+      getBriefStates(),
+      getAllLinks(),
+      getProcessGroupNames(),
+      runSync(),
+    ]);
+
+  const now = live ? Date.now() : DEMO_NOW;
+  const items = composeRegistry({ workflows, executions, owners, now });
+  const sharedCredentials = credentialGroups(workflows);
+  const blastById = blastMap(workflows, executions, owners, links, groupNames, now);
+
+  const attention = buildBrief({ items, changes, sharedCredentials, blastById }).filter(
+    (b) => states.get(b.key) !== "dismissed",
+  );
+
+  const channels = groupBriefsByChannel({ items, executions, changes, attention, sharedCredentials, now });
+  return { channels, live, scanned };
 }
