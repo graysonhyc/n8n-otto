@@ -40,9 +40,17 @@ function edgeStyle(kind: GraphEdge["kind"]): Partial<Edge> {
         style: { stroke: "var(--color-accent)", strokeWidth: 1.5 },
         markerEnd: { type: MarkerType.ArrowClosed, color: "var(--color-accent)" },
       };
+    case "subworkflow-tool":
+      return {
+        style: { stroke: "var(--color-ai)", strokeWidth: 1.5, strokeDasharray: "6 3" },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "var(--color-ai)" },
+        animated: false,
+      };
     case "shares-credential":
       return { style: { stroke: "var(--color-warn)", strokeWidth: 1.25, strokeDasharray: "5 4" } };
     case "uses-system":
+    case "uses-resource":
+    case "uses-credential":
       return { style: { stroke: "var(--color-line-2)", strokeWidth: 1, strokeDasharray: "2 3" } };
   }
 }
@@ -117,7 +125,7 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
         draggable: false,
         zIndex: 1,
       };
-      if (n.kind === "system") {
+      if (n.kind !== "workflow") {
         return { ...base, type: "system", data: { name: n.name, faded } };
       }
       return {

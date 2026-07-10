@@ -1,7 +1,14 @@
 import type { N8nWorkflow, N8nExecution, WorkflowType } from "@/lib/n8n/types";
 import type { Owner, ManualLink } from "@/lib/backoffice/types";
 import { composeRegistryItem } from "./registry";
-import { workflowCallEdges, sharedCredentialEdges, systemEdges } from "./edges";
+import {
+  workflowCallEdges,
+  sharedCredentialEdges,
+  systemEdges,
+  subworkflowToolEdges,
+  sharedDataSourceGroups,
+  credentialGroups,
+} from "./edges";
 import { computeProcessGroupsMerged, type ProcessGroup } from "./process";
 
 export type ColorBy = "risk" | "type" | "owner";
@@ -23,13 +30,37 @@ export interface SystemGraphNode {
   name: string;
 }
 
-export type GraphNode = WorkflowGraphNode | SystemGraphNode;
+export interface ResourceGraphNode {
+  id: string; // "res:<system>:<resource>"
+  kind: "resource";
+  name: string; // the resource id (sheet/channel/table/doc)
+  system: string;
+}
+
+export interface CredentialGraphNode {
+  id: string; // "cred:<credentialId>"
+  kind: "credential";
+  name: string;
+}
+
+export type GraphNode =
+  | WorkflowGraphNode
+  | SystemGraphNode
+  | ResourceGraphNode
+  | CredentialGraphNode;
 
 export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  kind: "calls" | "shares-credential" | "uses-system" | "manual";
+  kind:
+    | "calls"
+    | "subworkflow-tool"
+    | "shares-credential"
+    | "uses-system"
+    | "uses-resource"
+    | "uses-credential"
+    | "manual";
   tier: "A" | "B" | "M";
   label?: string;
 }
@@ -136,4 +167,80 @@ export function composeGraph(input: ComposeGraphInput): WorkflowGraph {
   }
 
   return { nodes: [...workflowNodes, ...systemNodes.values()], edges, groups };
+}
+
+export interface DeterministicInput {
+  workflows: N8nWorkflow[];
+  executions: N8nExecution[];
+  owners: Map<string, Owner>;
+  now: number;
+  layers: { dataSources: boolean; credentials: boolean };
+}
+
+/**
+ * The auto-parsed relationship graph. The strong dependency skeleton (calls +
+ * subworkflow-as-tool) is always emitted, directed. Weak affinities arrive only
+ * when their layer is on, and always as HUBS (a resource / credential node with
+ * spokes) — never pairwise edges — so a shared key can't become an N² mesh.
+ * Deterministic only: every edge comes from a fixed parser over the workflow JSON.
+ */
+export function composeDeterministic(input: DeterministicInput): WorkflowGraph {
+  const { workflows, executions, owners, now, layers } = input;
+  const ids = new Set(workflows.map((w) => w.id));
+
+  const workflowNodes: WorkflowGraphNode[] = workflows.map((wf) => {
+    const item = composeRegistryItem(wf, executions, owners.get(wf.id) ?? null, now);
+    return {
+      id: wf.id,
+      kind: "workflow",
+      name: item.name,
+      type: item.type,
+      risk: item.risk.level,
+      ownerTeam: item.owner?.team ?? null,
+      recentFailures: item.health.recentFailures,
+      groupKey: null,
+    };
+  });
+
+  const nodes: GraphNode[] = [...workflowNodes];
+  const edges: GraphEdge[] = [];
+
+  // Strong skeleton: calls + subworkflow-as-tool. Skip dangling targets.
+  for (const wf of workflows) {
+    for (const e of workflowCallEdges(wf)) {
+      if (ids.has(e.to)) {
+        edges.push({ id: `calls:${e.from}->${e.to}`, source: e.from, target: e.to, kind: "calls", tier: "A" });
+      }
+    }
+    for (const e of subworkflowToolEdges(wf)) {
+      if (ids.has(e.to)) {
+        edges.push({ id: `tool:${e.from}->${e.to}`, source: e.from, target: e.to, kind: "subworkflow-tool", tier: "A" });
+      }
+    }
+  }
+
+  // Weak affinity — shared data sources, as resource hubs.
+  if (layers.dataSources) {
+    for (const g of sharedDataSourceGroups(workflows)) {
+      nodes.push({ id: g.id, kind: "resource", name: g.resource, system: g.system });
+      for (const wid of g.workflowIds) {
+        edges.push({ id: `res:${g.id}:${wid}`, source: wid, target: g.id, kind: "uses-resource", tier: "A", label: g.system });
+      }
+    }
+  }
+
+  // Which workflow uses what credential, as credential hubs.
+  if (layers.credentials) {
+    for (const c of credentialGroups(workflows)) {
+      const nodeId = `cred:${c.credentialId}`;
+      const members = c.workflowIds.filter((wid) => ids.has(wid));
+      if (members.length === 0) continue;
+      nodes.push({ id: nodeId, kind: "credential", name: c.credentialName });
+      for (const wid of members) {
+        edges.push({ id: `${nodeId}:${wid}`, source: wid, target: nodeId, kind: "uses-credential", tier: "A", label: c.credentialName });
+      }
+    }
+  }
+
+  return { nodes, edges, groups: [] };
 }
