@@ -10,18 +10,31 @@ type Item = {
   icon: IconName;
   badge?: number;
   soon?: boolean;
+  external?: boolean;
+  disabled?: boolean;
+  hint?: string;
 };
 
 const BACKOFFICE: Item[] = [
   { href: "/brief", label: "Brief", icon: "shield", badge: 4 },
   { href: "/registry", label: "Registry", icon: "table" },
-  { href: "/map", label: "Map", icon: "map", soon: true },
+  { href: "/map", label: "Map", icon: "map" },
 ];
 
-const N8N: Item[] = [
-  { href: "#", label: "Overview", icon: "home" },
-  { href: "#", label: "Executions", icon: "pulse" },
-];
+// Deep-links into the connected n8n instance. Built from N8N_BASE_URL; when it's
+// not configured they render disabled rather than as dead "#" links.
+function n8nItems(baseUrl?: string): Item[] {
+  const base = baseUrl?.replace(/\/$/, "");
+  const links: { label: string; icon: IconName; path: string }[] = [
+    { label: "Overview", icon: "home", path: "/home/workflows" },
+    { label: "Executions", icon: "pulse", path: "/home/executions" },
+  ];
+  return links.map(({ label, icon, path }) =>
+    base
+      ? { href: `${base}${path}`, label, icon, external: true }
+      : { href: "#", label, icon, disabled: true, hint: "Set N8N_BASE_URL to enable" },
+  );
+}
 
 const ROW = "flex items-center gap-3 rounded-md px-2.5 py-2 text-[13.5px] font-medium";
 
@@ -37,10 +50,20 @@ function Row({ item, active }: { item: Item; active: boolean }) {
       </span>
     );
   }
+  if (item.disabled) {
+    return (
+      <span className={`${ROW} cursor-not-allowed text-faint`} title={item.hint}>
+        <Icon name={item.icon} size={16} className="opacity-70" />
+        {item.label}
+      </span>
+    );
+  }
   return (
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
+      target={item.external ? "_blank" : undefined}
+      rel={item.external ? "noreferrer" : undefined}
       className={`${ROW} border transition-colors ${
         active
           ? "border-accent-line bg-accent-dim text-white"
@@ -49,6 +72,9 @@ function Row({ item, active }: { item: Item; active: boolean }) {
     >
       <Icon name={item.icon} size={16} className={active ? "text-accent" : "opacity-85"} />
       {item.label}
+      {item.external && (
+        <Icon name="external" size={13} className="ml-auto text-faint" />
+      )}
       {item.badge ? (
         <span
           className={`ml-auto min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-bold text-white nums ${
@@ -70,9 +96,10 @@ function Label({ children }: { children: string }) {
   );
 }
 
-export function SideNav() {
+export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const n8n = n8nItems(n8nBaseUrl);
 
   return (
     <aside className="flex flex-col gap-0.5 border-r border-line bg-[color-mix(in_srgb,var(--color-panel)_88%,black)] px-3 py-3.5">
@@ -90,7 +117,7 @@ export function SideNav() {
       ))}
 
       <Label>Jump to n8n</Label>
-      {N8N.map((item) => (
+      {n8n.map((item) => (
         <Row key={item.label} item={item} active={false} />
       ))}
 
