@@ -3,7 +3,14 @@
 
 export type ParsedSlackEvent =
   | { kind: "challenge"; challenge: string }
-  | { kind: "mention"; text: string; channel: string; threadTs: string; userId: string | null }
+  | {
+      kind: "mention";
+      text: string;
+      channel: string;
+      threadTs: string;
+      messageTs: string;
+      userId: string | null;
+    }
   | { kind: "ignore" };
 
 interface AppMention {
@@ -47,6 +54,7 @@ export function parseSlackEvent(body: unknown, _botUserId: string): ParsedSlackE
     text: stripMentions(event.text ?? ""),
     channel: event.channel,
     threadTs: event.thread_ts ?? event.ts,
+    messageTs: event.ts,
     userId: event.user ?? null,
   };
 }

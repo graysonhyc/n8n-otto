@@ -29,6 +29,7 @@ describe("parseSlackEvent", () => {
       text: "what touches Stripe?",
       channel: "C123",
       threadTs: "1720000000.000100",
+      messageTs: "1720000000.000200",
       userId: "U0HUMAN",
     });
   });
