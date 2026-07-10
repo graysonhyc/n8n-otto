@@ -10,7 +10,9 @@ import { composeGraph, type WorkflowGraph } from "@/lib/derive/graph";
 export interface AgentContext {
   items: RegistryItem[];
   graph: WorkflowGraph;
+  executions: N8nExecution[];
   live: boolean;
+  now: number;
 }
 
 export interface RawInstance {
@@ -28,5 +30,5 @@ export function composeAgentContext(input: RawInstance): AgentContext {
   const { workflows, executions, owners, links, groupNames, now, live = false } = input;
   const items = composeRegistry({ workflows, executions, owners, now });
   const graph = composeGraph({ workflows, executions, owners, links, groupNames, now });
-  return { items, graph, live };
+  return { items, graph, executions, live, now };
 }

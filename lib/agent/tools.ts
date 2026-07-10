@@ -1,7 +1,34 @@
 import type { RegistryItem } from "@/lib/derive/registry";
 import { blastRadius } from "@/lib/derive/blast";
+import { estateLedger } from "@/lib/derive/ledger";
 import { workflowUrlFromEnv, executionsUrlFromEnv } from "@/lib/n8n/links";
 import type { AgentContext } from "./context";
+
+// Expand a capability phrase into match keywords, so "can issue refunds" or
+// "touches customer PII" resolve to the systems/tools that imply them.
+const CAPABILITY_SYNONYMS: Record<string, string[]> = {
+  refund: ["refund"],
+  payment: ["stripe", "payment", "charge", "invoice", "billing"],
+  money: ["stripe", "payment", "charge", "invoice", "refund"],
+  email: ["gmail", "email", "outlook", "mail", "sendgrid"],
+  pii: ["stripe", "zendesk", "hubspot", "gmail", "intercom", "salesforce", "customer"],
+  customer: ["stripe", "zendesk", "hubspot", "gmail", "intercom", "salesforce"],
+  crm: ["hubspot", "salesforce"],
+  support: ["zendesk", "intercom"],
+  slack: ["slack"],
+};
+
+function capabilityKeywords(phrase: string): string[] {
+  const tokens = phrase.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const kw = new Set<string>();
+  for (const t of tokens) {
+    const singular = t.endsWith("s") && t.length > 3 ? t.slice(0, -1) : t;
+    kw.add(t);
+    kw.add(singular);
+    for (const syn of CAPABILITY_SYNONYMS[singular] ?? CAPABILITY_SYNONYMS[t] ?? []) kw.add(syn);
+  }
+  return [...kw];
+}
 
 // Read-only tools the coworker can call. Each is a pure function of
 // (args, context); no I/O here (action tools that hit Linear/n8n are added
@@ -127,6 +154,60 @@ const TOOLS: Tool[] = [
         processGroup: b.processGroup ? b.processGroup.name : null,
         affectedOwnerTeams: b.affectedOwnerTeams,
       };
+    },
+  },
+  {
+    name: "estate_summary",
+    description:
+      "The Value & Waste ledger: how many workflows exist, hours saved in the recent window (ROI), the top contributors, and dead weight (idle or failing workflows) + unowned-critical count. Use for 'what is our automation estate worth?', 'what's wasting money?', 'give me the overview'.",
+    parameters: {
+      type: "object",
+      properties: { windowDays: { type: "number", description: "ROI window in days (default 30)" } },
+    },
+    run: (args, ctx) => {
+      const windowDays = typeof args.windowDays === "number" ? args.windowDays : 30;
+      return estateLedger(ctx.items, ctx.executions, ctx.now, windowDays);
+    },
+  },
+  {
+    name: "list_by_capability",
+    description:
+      "Find workflows by what they can DO or touch, not just keywords: 'can issue refunds', 'touches customer PII', 'emails customers', 'talks to the CRM'. Returns matches with owner + criticality — the audit/security answer.",
+    parameters: {
+      type: "object",
+      properties: { capability: { type: "string" } },
+      required: ["capability"],
+    },
+    run: (args, ctx) => {
+      const kws = capabilityKeywords(String(args.capability ?? ""));
+      const results = ctx.items
+        .filter((i) => kws.some((k) => matches(i, k)))
+        .map((i) => ({ ...summariseItem(i), tools: i.toolNames }));
+      return { capability: args.capability, matchedKeywords: kws, count: results.length, results };
+    },
+  },
+  {
+    name: "recent_changes",
+    description:
+      "Workflows edited within the last N days (default 7), newest first — 'what changed this week?'. For deep prompt/model/tool diffs, the daily brief carries those.",
+    parameters: {
+      type: "object",
+      properties: { sinceDays: { type: "number" } },
+    },
+    run: (args, ctx) => {
+      const sinceDays = typeof args.sinceDays === "number" ? args.sinceDays : 7;
+      const cutoff = ctx.now - sinceDays * 86_400_000;
+      const changed = ctx.items
+        .filter((i) => i.lastChange && Date.parse(i.lastChange) >= cutoff)
+        .map((i) => ({
+          id: i.id,
+          name: i.name,
+          owner: i.owner?.team ?? null,
+          lastChange: i.lastChange,
+          daysAgo: Math.floor((ctx.now - Date.parse(i.lastChange as string)) / 86_400_000),
+        }))
+        .sort((a, b) => Date.parse(b.lastChange as string) - Date.parse(a.lastChange as string));
+      return { sinceDays, count: changed.length, results: changed };
     },
   },
   {
