@@ -41,6 +41,9 @@ export interface N8nWorkflow {
   updatedAt?: string;
   // n8n includes owner/project info on some endpoints:
   homeProject?: { id: string; name: string } | null;
+  // Workflow settings. `timeSavedPerExecution` (minutes) is the native n8n
+  // Insights field an owner sets to estimate time saved per production run.
+  settings?: { timeSavedPerExecution?: number };
 }
 
 export interface N8nExecution {

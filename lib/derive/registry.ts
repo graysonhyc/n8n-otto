@@ -38,6 +38,9 @@ export interface RegistryItem {
   lastChange: string | null;
   project: string | null;
   disconnectedNodes: string[];
+  // Native n8n Insights field (minutes saved per production run), when the
+  // owner has set it. Null when unset — the brief falls back to a type default.
+  timeSavedPerExecution: number | null;
 }
 
 // Systems that touch customers / money → raise criticality.
@@ -163,6 +166,7 @@ export function composeRegistryItem(
     lastChange,
     project: workflow.homeProject?.name ?? null,
     disconnectedNodes,
+    timeSavedPerExecution: workflow.settings?.timeSavedPerExecution ?? null,
   };
 }
 

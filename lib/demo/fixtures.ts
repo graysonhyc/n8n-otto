@@ -66,6 +66,7 @@ export const customerOnboarding: N8nWorkflow = {
   tags: [{ name: "production" }, { name: "revops" }],
   homeProject: { id: "prj_revops", name: "RevOps" },
   updatedAt: "2026-07-03T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 12 },
   nodes: [
     { name: "Stripe subscription created", type: "n8n-nodes-base.stripeTrigger", credentials: { stripeApi: { id: "cred_stripe", name: "Stripe" } } },
     { name: "HubSpot update", type: "n8n-nodes-base.hubspot", credentials: { hubspotApi: SHARED_HUBSPOT } },
@@ -139,15 +140,66 @@ export const ptoApprovalBot: N8nWorkflow = {
   },
 };
 
+// Scheduled AI agent — the "runs today" anchor. Fires daily on a schedule
+// trigger, so it shows up in the brief's look-ahead. Owner set time saved.
+export const revenueReportAgent: N8nWorkflow = {
+  id: "wf_revenue_report_agent",
+  name: "Revenue Report Agent",
+  active: true,
+  tags: [{ name: "production" }, { name: "finance" }],
+  homeProject: { id: "prj_finance", name: "Finance" },
+  updatedAt: "2026-06-30T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 30 },
+  nodes: [
+    { name: "Every day 08:00", type: "n8n-nodes-base.scheduleTrigger", parameters: { rule: { interval: [{ field: "days" }] } } },
+    { name: "Revenue Report Agent", type: "@n8n/n8n-nodes-langchain.agent", parameters: { options: { systemMessage: "Summarise yesterday's revenue and post to Slack." } } },
+    { name: "OpenAI GPT-4o", type: "@n8n/n8n-nodes-langchain.lmChatOpenAi", parameters: { model: "gpt-4o" } },
+    { name: "BigQuery", type: "n8n-nodes-base.googleBigQueryTool", credentials: { googleBigQueryOAuth2Api: { id: "cred_bq", name: "BigQuery" } } },
+    { name: "Slack post", type: "n8n-nodes-base.slack", parameters: { channel: "#finance" }, credentials: { slackApi: { id: "cred_slack", name: "Slack" } } },
+  ],
+  connections: {
+    "Every day 08:00": { main: [[{ node: "Revenue Report Agent", type: "main", index: 0 }]] },
+    "OpenAI GPT-4o": { ai_languageModel: [[{ node: "Revenue Report Agent", type: "ai_languageModel", index: 0 }]] },
+    BigQuery: { ai_tool: [[{ node: "Revenue Report Agent", type: "ai_tool", index: 0 }]] },
+    "Revenue Report Agent": { main: [[{ node: "Slack post", type: "main", index: 0 }]] },
+  },
+};
+
 export const allWorkflows: N8nWorkflow[] = [
   refundReviewAgent,
   customerOnboarding,
   welcomeEmailAgent,
   leadRouting,
   ptoApprovalBot,
+  revenueReportAgent,
 ];
 
-// A few executions: Refund agent failing repeatedly (health signal), others healthy.
+// Builds N successful executions for a workflow on 2026-07-09, spaced through the
+// day, each lasting `durationSec`. Used to give the daily brief realistic volume.
+function successRuns(
+  workflowId: string,
+  count: number,
+  durationSec: number,
+  startHour = 6,
+): N8nExecution[] {
+  return Array.from({ length: count }, (_, i) => {
+    const min = (i * 7) % 50;
+    const hh = String(startHour + Math.floor((i * 7) / 50)).padStart(2, "0");
+    const mm = String(min).padStart(2, "0");
+    const ss = String(durationSec % 60).padStart(2, "0");
+    return {
+      id: `ex_${workflowId}_${i}`,
+      workflowId,
+      finished: true,
+      status: "success" as const,
+      startedAt: `2026-07-09T${hh}:${mm}:00.000Z`,
+      stoppedAt: `2026-07-09T${hh}:${mm}:${ss}.000Z`,
+    };
+  });
+}
+
+// Yesterday's activity (2026-07-09): Refund agent failing repeatedly (health
+// signal), everything else running healthily with varied volume and duration.
 export const executions: N8nExecution[] = [
   ...Array.from({ length: 6 }, (_, i) => ({
     id: `ex_refund_${i}`,
@@ -157,12 +209,9 @@ export const executions: N8nExecution[] = [
     startedAt: `2026-07-09T14:${10 + i}:00.000Z`,
     stoppedAt: `2026-07-09T14:${10 + i}:05.000Z`,
   })),
-  {
-    id: "ex_onboard_1",
-    workflowId: "wf_customer_onboarding",
-    finished: true,
-    status: "success",
-    startedAt: "2026-07-09T12:00:00.000Z",
-    stoppedAt: "2026-07-09T12:00:03.000Z",
-  },
+  ...successRuns("wf_customer_onboarding", 18, 4),
+  ...successRuns("wf_lead_routing", 42, 2),
+  ...successRuns("wf_welcome_email_agent", 16, 6),
+  ...successRuns("wf_pto_approval_bot", 5, 45),
+  ...successRuns("wf_revenue_report_agent", 1, 38),
 ];
