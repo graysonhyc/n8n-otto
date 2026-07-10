@@ -61,11 +61,26 @@ model BriefItemState {
 }
 
 /// Human-given name for an SOP process cluster. `key` is a canonical hash of the
-/// sorted member workflow ids (membership itself lives in the part-of-process links).
+/// A hand-authored SOP (the "epic"). Members are workflows assigned via
+/// ProcessGroupMember (the "tickets"). Authored in the Relationships > Process
+/// groups view; unrelated to the deterministic auto-parsed relationships.
 model ProcessGroup {
-  key       String   @id
-  name      String
-  updatedAt DateTime @updatedAt
+  id          String               @id @default(cuid())
+  name        String
+  description String?
+  updatedAt   DateTime             @updatedAt @default(now())
+  members     ProcessGroupMember[]
+}
+
+/// A workflow assigned into one SOP at an ordered step. workflowId is the PK, so
+/// a workflow belongs to at most one SOP (for now).
+model ProcessGroupMember {
+  workflowId String       @id
+  groupId    String
+  position   Int          @default(0)
+  group      ProcessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
 }
 
 /// Per-key "already notified" state for real-time attention alerts. A row means

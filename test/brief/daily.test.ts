@@ -24,8 +24,9 @@ describe("computeYesterday", () => {
   });
 
   it("estimates time saved, flagging when defaults were used", () => {
-    // onboarding 18*12 + lead 42*3 + welcome 16*8 + pto 5*10 + revenue 1*30
-    expect(y.timeSavedMinutes).toBe(550);
+    // onboarding 18*12 + lead 42*3 + welcome 16*8 + pto 5*8 + revenue 1*30
+    // (pto is ai-assisted now that human-in-loop is no longer its own type)
+    expect(y.timeSavedMinutes).toBe(540);
     expect(y.timeSavedEstimated).toBe(true);
   });
 

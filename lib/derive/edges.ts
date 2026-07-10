@@ -36,6 +36,7 @@ export interface SystemEdge {
 
 const AGENT_TYPE = "@n8n/n8n-nodes-langchain.agent";
 const EXECUTE_WORKFLOW_TYPE = "n8n-nodes-base.executeWorkflow";
+const TOOL_WORKFLOW_TYPE = "@n8n/n8n-nodes-langchain.toolWorkflow";
 
 function baseName(type: string): string {
   return type.split(".").pop() ?? type;
@@ -76,6 +77,50 @@ export function agentToolEdges(workflow: N8nWorkflow): AgentToolEdge[] {
           edges.push({ from: target.node, to: sourceName, kind: "agent-tool", tier: "A" });
         }
       }
+    }
+  }
+  return edges;
+}
+
+export interface SubworkflowToolEdge {
+  from: string; // caller (agent-hosting) workflow id
+  to: string; // referenced sub-workflow id, exposed as a tool
+  kind: "subworkflow-tool";
+  tier: "A";
+}
+
+/**
+ * Subworkflows exposed to an agent as a tool: a `toolWorkflow` (or Execute
+ * Workflow) node wired via an `ai_tool` connection into an agent node, and
+ * referencing another workflow id. This is a cross-workflow dependency, unlike
+ * `agentToolEdges` (which is node→agent within one workflow).
+ */
+export function subworkflowToolEdges(workflow: N8nWorkflow): SubworkflowToolEdge[] {
+  const agents = new Set(
+    workflow.nodes.filter((n) => n.type === AGENT_TYPE).map((n) => n.name),
+  );
+  if (agents.size === 0) return [];
+
+  // node name → referenced workflow id, for tool-capable nodes only.
+  const refByNode = new Map<string, string>();
+  for (const node of workflow.nodes) {
+    if (node.type !== TOOL_WORKFLOW_TYPE && node.type !== EXECUTE_WORKFLOW_TYPE) continue;
+    const ref = referencedWorkflowId(node.parameters);
+    if (ref) refByNode.set(node.name, ref);
+  }
+
+  const edges: SubworkflowToolEdge[] = [];
+  const seen = new Set<string>();
+  for (const [sourceName, byType] of Object.entries(workflow.connections)) {
+    if (!byType.ai_tool) continue;
+    const to = refByNode.get(sourceName);
+    if (!to || seen.has(to)) continue;
+    const feedsAgent = byType.ai_tool.some((group) =>
+      group.some((t) => agents.has(t.node)),
+    );
+    if (feedsAgent) {
+      seen.add(to);
+      edges.push({ from: workflow.id, to, kind: "subworkflow-tool", tier: "A" });
     }
   }
   return edges;
@@ -144,6 +189,7 @@ const SYSTEM_BY_NODE: Record<string, string> = {
   zendesk: "Zendesk",
   gmail: "Gmail",
   googleBigQuery: "BigQuery",
+  googleSheets: "Google Sheets",
   postgres: "Postgres",
   notion: "Notion",
 };
@@ -174,4 +220,37 @@ export function systemEdges(workflow: N8nWorkflow): SystemEdge[] {
     });
   }
   return edges;
+}
+
+export interface DataSourceGroup {
+  id: string; // "res:<system>:<resource>"
+  system: string;
+  resource: string;
+  workflowIds: string[]; // sorted, length >= 2
+}
+
+/**
+ * Workflows that read/write the SAME specific resource (a Google Sheet document,
+ * a Slack channel, a DB table…), grouped into one hub. Only resources touched by
+ * ≥2 workflows are returned — that shared touch is the relationship. Deterministic:
+ * the resource id comes straight from node parameters via `resourceKey`.
+ */
+export function sharedDataSourceGroups(workflows: N8nWorkflow[]): DataSourceGroup[] {
+  const byRes = new Map<string, { system: string; resource: string; ids: Set<string> }>();
+  for (const wf of workflows) {
+    for (const node of wf.nodes) {
+      const base = baseName(node.type);
+      const normalized = base.endsWith("Tool") ? base.slice(0, -4) : base;
+      const system = SYSTEM_BY_NODE[normalized];
+      const resource = resourceKey(node.parameters);
+      if (!system || !resource) continue;
+      const key = `res:${system}:${resource}`;
+      const entry = byRes.get(key) ?? { system, resource, ids: new Set<string>() };
+      entry.ids.add(wf.id);
+      byRes.set(key, entry);
+    }
+  }
+  return [...byRes.entries()]
+    .filter(([, v]) => v.ids.size >= 2)
+    .map(([id, v]) => ({ id, system: v.system, resource: v.resource, workflowIds: [...v.ids].sort() }));
 }

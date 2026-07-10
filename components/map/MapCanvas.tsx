@@ -22,10 +22,9 @@ import { colorFor } from "./legend";
 import { layout } from "./layout";
 import { WorkflowNode } from "./WorkflowNode";
 import { SystemNode } from "./SystemNode";
-import { GroupNode } from "./GroupNode";
 import { MapControls } from "./MapControls";
 
-const nodeTypes = { workflow: WorkflowNode, system: SystemNode, group: GroupNode };
+const nodeTypes = { workflow: WorkflowNode, system: SystemNode };
 
 function edgeStyle(kind: GraphEdge["kind"]): Partial<Edge> {
   switch (kind) {
@@ -35,14 +34,17 @@ function edgeStyle(kind: GraphEdge["kind"]): Partial<Edge> {
         markerEnd: { type: MarkerType.ArrowClosed, color: "var(--color-muted)" },
         animated: false,
       };
-    case "manual":
+    case "subworkflow-tool":
       return {
-        style: { stroke: "var(--color-accent)", strokeWidth: 1.5 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: "var(--color-accent)" },
+        style: { stroke: "var(--color-ai)", strokeWidth: 1.5, strokeDasharray: "6 3" },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "var(--color-ai)" },
+        animated: false,
       };
-    case "shares-credential":
-      return { style: { stroke: "var(--color-warn)", strokeWidth: 1.25, strokeDasharray: "5 4" } };
-    case "uses-system":
+    case "uses-resource":
+      return { style: { stroke: "var(--color-line-2)", strokeWidth: 1, strokeDasharray: "2 3" } };
+    case "uses-credential":
+      return { style: { stroke: "var(--color-warn)", strokeWidth: 1, strokeDasharray: "2 3" } };
+    default:
       return { style: { stroke: "var(--color-line-2)", strokeWidth: 1, strokeDasharray: "2 3" } };
   }
 }
@@ -51,36 +53,28 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
   const router = useRouter();
   const { fitView } = useReactFlow();
   const [colorBy, setColorBy] = useState<ColorBy>("risk");
-  const [showSystems, setShowSystems] = useState(true);
-  const [showHeuristic, setShowHeuristic] = useState(true);
+  const [showDataSources, setShowDataSources] = useState(false);
+  const [showCredentials, setShowCredentials] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const onRename = useCallback(
-    (key: string, name: string) => {
-      void fetch("/api/process-groups", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, name }),
-      }).then(() => router.refresh());
-    },
-    [router],
-  );
-
-  // Filter nodes/edges per the active toggles.
+  // Filter nodes/edges per the active layer toggles. Dependencies (workflow
+  // nodes + calls / subworkflow-tool edges) are always shown.
   const filtered = useMemo(() => {
-    const nodes = graph.nodes.filter((n) => (n.kind === "system" ? showSystems : true));
+    const nodes = graph.nodes.filter((n) => {
+      if (n.kind === "resource") return showDataSources;
+      if (n.kind === "credential") return showCredentials;
+      return true;
+    });
     const present = new Set(nodes.map((n) => n.id));
     const edges = graph.edges.filter((e) => {
-      if (e.kind === "uses-system" && (!showSystems || !showHeuristic)) return false;
+      if (e.kind === "uses-resource" && !showDataSources) return false;
+      if (e.kind === "uses-credential" && !showCredentials) return false;
       return present.has(e.source) && present.has(e.target);
     });
     return { nodes, edges };
-  }, [graph, showSystems, showHeuristic]);
+  }, [graph, showDataSources, showCredentials]);
 
-  const laid = useMemo(
-    () => layout(filtered.nodes, filtered.edges, graph.groups),
-    [filtered, graph.groups],
-  );
+  const laid = useMemo(() => layout(filtered.nodes, filtered.edges, []), [filtered]);
   const posById = useMemo(() => new Map(laid.nodes.map((n) => [n.id, n])), [laid]);
 
   // Neighbor set for hover highlight.
@@ -95,30 +89,23 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
   }, [hovered, filtered.edges]);
 
   const rfNodes = useMemo<Node[]>(() => {
-    const groupNodes: Node[] = laid.groups.map((b) => ({
-      id: b.id,
-      type: "group",
-      position: { x: b.x, y: b.y },
-      data: { name: b.name, groupKey: b.id, onRename },
-      style: { width: b.width, height: b.height },
-      selectable: false,
-      draggable: false,
-      zIndex: 0,
-    }));
-
-    const contentNodes: Node[] = filtered.nodes.map((n) => {
+    return filtered.nodes.map((n) => {
       const p = posById.get(n.id)!;
       const faded = neighbors ? !neighbors.has(n.id) : false;
       const base = {
         id: n.id,
         position: { x: p.x, y: p.y },
-        parentId: p.parentId,
-        extent: p.parentId ? ("parent" as const) : undefined,
         draggable: false,
         zIndex: 1,
       };
-      if (n.kind === "system") {
-        return { ...base, type: "system", data: { name: n.name, faded } };
+      if (n.kind === "resource") {
+        return { ...base, type: "system", data: { name: n.name, faded, variant: "resource", system: n.system } };
+      }
+      if (n.kind === "credential") {
+        return { ...base, type: "system", data: { name: n.name, faded, variant: "credential" } };
+      }
+      if (n.kind !== "workflow") {
+        return { ...base, type: "system", data: { name: n.name, faded, variant: "resource" } };
       }
       return {
         ...base,
@@ -132,9 +119,7 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
         },
       };
     });
-
-    return [...groupNodes, ...contentNodes];
-  }, [laid.groups, filtered.nodes, posById, neighbors, colorBy, onRename]);
+  }, [filtered.nodes, posById, neighbors, colorBy]);
 
   const rfEdges = useMemo<Edge[]>(
     () =>
@@ -144,7 +129,7 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
           id: e.id,
           source: e.source,
           target: e.target,
-          label: e.kind === "manual" || e.kind === "shares-credential" ? e.label : undefined,
+          label: e.kind === "subworkflow-tool" ? "tool" : undefined,
           labelStyle: { fill: "var(--color-faint)", fontSize: 10 },
           labelBgStyle: { fill: "var(--color-panel)" },
           ...edgeStyle(e.kind),
@@ -176,7 +161,7 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
         edges={rfEdges}
         nodeTypes={nodeTypes}
         onNodeClick={onNodeClick}
-        onNodeMouseEnter={(_, n) => n.type !== "group" && setHovered(n.id)}
+        onNodeMouseEnter={(_, n) => setHovered(n.id)}
         onNodeMouseLeave={() => setHovered(null)}
         nodesDraggable={false}
         nodesConnectable={false}
@@ -194,10 +179,10 @@ function Canvas({ graph, live }: { graph: WorkflowGraph; live: boolean }) {
       <MapControls
         colorBy={colorBy}
         onColorBy={setColorBy}
-        showSystems={showSystems}
-        onShowSystems={setShowSystems}
-        showHeuristic={showHeuristic}
-        onShowHeuristic={setShowHeuristic}
+        showDataSources={showDataSources}
+        onShowDataSources={setShowDataSources}
+        showCredentials={showCredentials}
+        onShowCredentials={setShowCredentials}
         onReset={() => fitView({ duration: 300 })}
         nodes={graph.nodes as GraphNode[]}
         live={live}

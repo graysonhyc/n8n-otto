@@ -9,7 +9,6 @@ const TYPE_COLOR: Record<WorkflowType, string> = {
   deterministic: "var(--color-info)",
   "ai-assisted": "var(--color-ai)",
   "ai-agent-tools": "var(--color-accent)",
-  "human-in-loop": "var(--color-warn)",
 };
 
 // Deterministic palette for owner teams; null owner → faint grey.
@@ -33,9 +32,9 @@ export function ownerColor(team: string | null): string {
   return OWNER_PALETTE[hashIndex(team, OWNER_PALETTE.length)];
 }
 
-/** Accent color for a workflow node under the given color-by mode. */
+/** Accent color for a graph node under the given color-by mode. */
 export function colorFor(node: GraphNode, mode: ColorBy): string {
-  if (node.kind === "system") return "var(--color-line-2)";
+  if (node.kind !== "workflow") return "var(--color-line-2)";
   switch (mode) {
     case "risk":
       return RISK_COLOR[node.risk];

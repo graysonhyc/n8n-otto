@@ -6,6 +6,8 @@ import type {
   ManualLink,
   Owner,
   OwnerSource,
+  Sop,
+  SopWithMembers,
 } from "./types";
 
 // ---- Owners -----------------------------------------------------------------
@@ -149,19 +151,76 @@ export async function setBriefState(
   });
 }
 
-// ---- Process group names (SOP clusters) ------------------------------------
+// ---- SOP process groups (hand-authored epic → tickets) ---------------------
 
-export async function getProcessGroupNames(): Promise<Map<string, string>> {
-  const rows = await prisma.processGroup.findMany();
-  return new Map(rows.map((r) => [r.key, r.name]));
+/** All SOPs with their members ordered by step position. */
+export async function listSops(): Promise<SopWithMembers[]> {
+  const rows = await prisma.processGroup.findMany({
+    include: { members: { orderBy: { position: "asc" } } },
+    orderBy: { name: "asc" },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    members: r.members.map((m) => ({ workflowId: m.workflowId, groupId: m.groupId, position: m.position })),
+  }));
 }
 
-export async function setProcessGroupName(key: string, name: string): Promise<void> {
-  await prisma.processGroup.upsert({
-    where: { key },
-    create: { key, name },
-    update: { name },
+export async function createSop(name: string): Promise<Sop> {
+  const row = await prisma.processGroup.create({ data: { name } });
+  return { id: row.id, name: row.name, description: row.description };
+}
+
+export async function updateSop(
+  id: string,
+  patch: { name?: string; description?: string | null },
+): Promise<void> {
+  await prisma.processGroup.update({ where: { id }, data: patch });
+}
+
+export async function deleteSop(id: string): Promise<void> {
+  // Members cascade-delete via the FK.
+  await prisma.processGroup.delete({ where: { id } });
+}
+
+/**
+ * Assign a workflow into an SOP. Because workflowId is the member PK, assigning a
+ * workflow that already belongs to another SOP MOVES it (upsert) — enforcing the
+ * one-workflow-one-SOP rule. Appends to the end unless a position is given.
+ */
+export async function assignMember(
+  workflowId: string,
+  groupId: string,
+  position?: number,
+): Promise<void> {
+  const pos =
+    position ??
+    ((await prisma.processGroupMember.count({ where: { groupId } })) as number);
+  await prisma.processGroupMember.upsert({
+    where: { workflowId },
+    create: { workflowId, groupId, position: pos },
+    update: { groupId, position: pos },
   });
+}
+
+export async function unassignMember(workflowId: string): Promise<void> {
+  await prisma.processGroupMember.delete({ where: { workflowId } });
+}
+
+/** Rewrite step order for a group from an ordered list of workflow ids. */
+export async function reorderMembers(
+  groupId: string,
+  orderedWorkflowIds: string[],
+): Promise<void> {
+  await prisma.$transaction(
+    orderedWorkflowIds.map((workflowId, position) =>
+      prisma.processGroupMember.updateMany({
+        where: { workflowId, groupId },
+        data: { position },
+      }),
+    ),
+  );
 }
 
 // ---- Real-time notification state ------------------------------------------

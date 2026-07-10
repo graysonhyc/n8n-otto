@@ -125,11 +125,12 @@ export function classify(workflow: N8nWorkflow): Classification {
     ),
   );
 
+  // Note: `humanInLoop` (a wait/approval node) is still surfaced as a flag on
+  // the classification, but it no longer forms its own type — such workflows
+  // fall through to ai-assisted or deterministic based on AI usage.
   let type: WorkflowType;
   if (hasAgent && toolNames.length > 0) type = "ai-agent-tools";
-  else if (usesAI && !hasAgent && humanInLoop) type = "human-in-loop";
   else if (usesAI) type = "ai-assisted";
-  else if (humanInLoop) type = "human-in-loop";
   else type = "deterministic";
 
   return {

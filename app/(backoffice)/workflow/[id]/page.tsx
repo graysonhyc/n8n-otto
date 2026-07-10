@@ -74,36 +74,30 @@ export default async function WorkflowDetail({
 
         {/* Right column */}
         <div className="flex flex-col gap-3.5">
-          <Section title="Ownership" icon={<Icon name="people" size={14} />}>
+          <Section title="Channel" icon={<Icon name="people" size={14} />}>
             {item.owner ? (
               <KeyValue
                 rows={[
                   [
-                    "Owner",
+                    "Channel",
                     <span key="o" className="inline-flex items-center gap-2">
-                      {item.owner.team}
+                      <span className="text-accent">
+                        #{(item.owner.slackChannelName ?? item.owner.team).replace(/^#+/, "")}
+                      </span>
                       <Pill tone="ok" dot={false}>
                         {item.owner.confirmed ? "confirmed" : "inferred"}
                       </Pill>
                     </span>,
                   ],
-                  [
-                    "Channel",
-                    item.owner.slackChannelName ? (
-                      <span className="text-accent">{item.owner.slackChannelName}</span>
-                    ) : (
-                      "—"
-                    ),
-                  ],
                 ]}
               />
             ) : (
               <p className="text-[13px] text-danger">
-                No owner assigned. Assign one from the Registry to enable Slack routing.
+                No channel assigned. Set one from the Registry to enable Slack routing.
               </p>
             )}
             <div className="mt-3 rounded-lg border-l-2 border-ai bg-panel-3 px-3 py-2 text-[12.5px] text-muted">
-              <b className="text-ink">Why this owner: </b>
+              <b className="text-ink">Why this channel: </b>
               {enrichment.ownerReasoning}
             </div>
           </Section>

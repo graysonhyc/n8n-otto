@@ -6,7 +6,6 @@ export const TYPE_LABEL: Record<WorkflowType, string> = {
   deterministic: "Workflow",
   "ai-assisted": "AI-assisted",
   "ai-agent-tools": "AI agent",
-  "human-in-loop": "Human-in-loop",
 };
 
 export const TRIGGER_LABEL: Record<TriggerKind, string> = {

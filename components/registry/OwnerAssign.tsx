@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { SlackChannelPicker, type SlackChannel } from "@/components/ui/SlackChannelPicker";
 
-// Inline ownership cell: shows the confirmed owner, or an "Assign" affordance
-// that reads the live Slack channels to pick a routing target.
+// Inline channel cell: shows the routed Slack channel, or an "Assign" affordance
+// that reads the live Slack channels to pick one. The chosen channel *is* the
+// ownership — its name is persisted as the owner "team" so downstream routing
+// (brief, Slack, Linear) keeps working unchanged.
 export function OwnerAssign({ item }: { item: RegistryItem }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [team, setTeam] = useState(item.owner?.team ?? "");
   const [channel, setChannel] = useState<SlackChannel | null>(
     item.owner?.slackChannelId
       ? { id: item.owner.slackChannelId, name: item.owner.slackChannelName ?? "", isMember: true }
@@ -33,42 +34,29 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
   }
 
   async function save() {
-    if (!team.trim()) return;
+    if (!channel) return;
+    // The channel name doubles as the routing key ("team") downstream.
     await post({
       workflowId: item.id,
-      team: team.trim(),
-      slackChannelId: channel?.id ?? null,
-      slackChannelName: channel?.name ?? null,
-    });
-  }
-
-  // One-click accept of the classifier's suggestion — provenance kept as "inferred".
-  async function applySuggestion() {
-    const s = item.suggestedOwner;
-    if (!s) return;
-    await post({
-      workflowId: item.id,
-      team: s.team,
-      reasoning: s.reasoning,
-      source: "inferred",
+      team: channel.name,
+      slackChannelId: channel.id,
+      slackChannelName: channel.name,
     });
   }
 
   if (!open) {
     if (item.owner) {
+      const label = (item.owner.slackChannelName ?? item.owner.team).replace(/^#+/, "");
       return (
-        <button onClick={() => setOpen(true)} title="Edit owner" className="group text-left">
-          <span className="flex items-center gap-1.5 text-ink">
-            {item.owner.team}
+        <button onClick={() => setOpen(true)} title="Edit channel" className="group text-left">
+          <span className="flex items-center gap-1.5 text-accent">
+            #{label}
             <Icon
               name="pencil"
               size={12}
               className="shrink-0 text-faint transition-colors group-hover:text-muted"
             />
           </span>
-          {item.owner.slackChannelName && (
-            <span className="block text-[11px] text-accent">{item.owner.slackChannelName}</span>
-          )}
         </button>
       );
     }
@@ -78,7 +66,7 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
       return (
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] uppercase tracking-wide text-faint">Suggested</span>
+            <span className="text-[10px] uppercase tracking-wide text-faint">Likely</span>
             <span className="text-ink">{sTeam}</span>
             <span
               className={`rounded px-1 py-px text-[9.5px] uppercase tracking-wide ${
@@ -90,21 +78,12 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
               {confidence}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={applySuggestion}
-              disabled={saving}
-              className="rounded-md border border-accent-dim bg-accent-dim px-2 py-0.5 text-[11px] font-semibold text-accent hover:opacity-80 disabled:opacity-50"
-            >
-              {saving ? "Applying…" : "Apply"}
-            </button>
-            <button
-              onClick={() => setOpen(true)}
-              className="text-[11px] text-muted hover:text-ink hover:underline"
-            >
-              Edit
-            </button>
-          </div>
+          <button
+            onClick={() => setOpen(true)}
+            className="self-start text-[11px] font-semibold text-danger hover:underline"
+          >
+            Set channel
+          </button>
         </div>
       );
     }
@@ -121,16 +100,9 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
 
   return (
     <div className="flex w-56 flex-col gap-2 rounded-lg border border-line-2 bg-panel-2 p-2.5">
-      <input
-        autoFocus
-        value={team}
-        onChange={(e) => setTeam(e.target.value)}
-        placeholder="Owner team (e.g. Support Ops)"
-        className="rounded-md border border-line bg-panel-3 px-2 py-1 text-[12px] text-ink placeholder:text-faint"
-      />
       <SlackChannelPicker value={channel?.id ?? null} onChange={setChannel} />
       <div className="flex gap-2">
-        <Button variant="primary" onClick={save} disabled={saving || !team.trim()}>
+        <Button variant="primary" onClick={save} disabled={saving || !channel}>
           {saving ? "Saving…" : "Save"}
         </Button>
         <Button variant="ghost" onClick={() => setOpen(false)}>

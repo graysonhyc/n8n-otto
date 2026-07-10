@@ -18,7 +18,7 @@ type Item = {
 const BACKOFFICE: Item[] = [
   { href: "/brief", label: "Brief", icon: "shield", badge: 4 },
   { href: "/registry", label: "Registry", icon: "table" },
-  { href: "/map", label: "Map", icon: "map" },
+  { href: "/map", label: "Relationships", icon: "map" },
 ];
 
 // Deep-links into the connected n8n instance. Built from N8N_BASE_URL; when it's

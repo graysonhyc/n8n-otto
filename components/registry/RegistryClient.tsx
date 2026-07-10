@@ -31,7 +31,7 @@ type FilterKey =
 const FILTERS: { key: FilterKey; label: string; test: (i: RegistryItem) => boolean }[] = [
   { key: "uses-ai", label: "Uses AI", test: (i) => i.usesAI },
   { key: "tool-access", label: "Has tool access", test: (i) => i.hasToolAccess },
-  { key: "no-owner", label: "No owner", test: (i) => !i.owner },
+  { key: "no-owner", label: "No channel", test: (i) => !i.owner },
   { key: "customer-facing", label: "Customer-facing", test: (i) => i.criticality === "High" },
   {
     key: "recently-changed",
@@ -56,7 +56,7 @@ function sortValue(i: RegistryItem, key: SortKey): string | number {
     case "type":
       return TYPE_LABEL[i.type];
     case "owner":
-      return i.owner?.team?.toLowerCase() ?? "~"; // unassigned sorts last
+      return (i.owner?.slackChannelName ?? i.owner?.team)?.toLowerCase() ?? "~"; // unassigned sorts last
     case "criticality":
       return CRIT_RANK[i.criticality];
     case "lastChange":
@@ -71,7 +71,7 @@ function sortValue(i: RegistryItem, key: SortKey): string | number {
 const COLUMNS: { label: string; sort?: SortKey }[] = [
   { label: "Name", sort: "name" },
   { label: "Type", sort: "type" },
-  { label: "Owner", sort: "owner" },
+  { label: "Channel", sort: "owner" },
   { label: "Crit.", sort: "criticality" },
   { label: "AI" },
   { label: "Systems" },
@@ -81,18 +81,10 @@ const COLUMNS: { label: string; sort?: SortKey }[] = [
 
 export function RegistryClient({ items }: { items: RegistryItem[] }) {
   const [active, setActive] = useState<Set<FilterKey>>(new Set());
-  const [owner, setOwner] = useState("");
   const [channel, setChannel] = useState("");
   const [type, setType] = useState<WorkflowType | "">("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "risk", dir: 1 });
 
-  const owners = useMemo(
-    () =>
-      Array.from(
-        new Set(items.map((i) => i.owner?.team).filter((t): t is string => !!t)),
-      ).sort(),
-    [items],
-  );
   const channels = useMemo(
     () =>
       Array.from(
@@ -107,8 +99,8 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
     const filtered = items.filter(
       (i) =>
         tests.every((t) => t(i)) &&
-        (owner === "" || (owner === UNASSIGNED ? !i.owner : i.owner?.team === owner)) &&
-        (channel === "" || i.owner?.slackChannelName === channel) &&
+        (channel === "" ||
+          (channel === UNASSIGNED ? !i.owner : i.owner?.slackChannelName === channel)) &&
         (type === "" || i.type === type),
     );
     return filtered.sort((a, b) => {
@@ -116,7 +108,7 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
       const y = sortValue(b, sort.key);
       return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
     });
-  }, [items, active, owner, channel, type, sort]);
+  }, [items, active, channel, type, sort]);
 
   function toggle(key: FilterKey) {
     setActive((prev) => {
@@ -130,10 +122,9 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
   }
 
-  const hasFilters = active.size > 0 || owner !== "" || channel !== "" || type !== "";
+  const hasFilters = active.size > 0 || channel !== "" || type !== "";
   function reset() {
     setActive(new Set());
-    setOwner("");
     setChannel("");
     setType("");
   }
@@ -144,21 +135,12 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <select aria-label="Filter by owner" value={owner} onChange={(e) => setOwner(e.target.value)} className={selectClass}>
-          <option value="">All owners</option>
-          <option value={UNASSIGNED}>Unassigned</option>
-          {owners.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-
         <select aria-label="Filter by channel" value={channel} onChange={(e) => setChannel(e.target.value)} className={selectClass}>
           <option value="">All channels</option>
+          <option value={UNASSIGNED}>Unassigned</option>
           {channels.map((c) => (
             <option key={c} value={c}>
-              {c}
+              #{c}
             </option>
           ))}
         </select>
