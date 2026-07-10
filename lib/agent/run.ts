@@ -64,7 +64,8 @@ export async function runAgent(input: RunAgentInput): Promise<{ text: string }> 
     tools = toolSpecs,
     runTool = dispatch,
     maxIters = 6,
-    model = process.env.OTTO_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4.1",
+    // `||` (not `??`) so an empty-string env var falls through to the default.
+    model = process.env.OTTO_MODEL || process.env.OPENAI_MODEL || "gpt-4.1",
   } = input;
 
   const messages: ChatMessage[] = [
