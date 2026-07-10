@@ -34,6 +34,8 @@ export interface N8nWorkflow {
   id: string;
   name: string;
   active: boolean;
+  // n8n workflow archiving — archived workflows are hidden from the dashboard.
+  isArchived?: boolean;
   nodes: N8nNode[];
   connections: N8nConnections;
   tags?: N8nTag[];

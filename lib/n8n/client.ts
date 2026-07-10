@@ -3,6 +3,7 @@ import type {
   N8nExecution,
   N8nWorkflow,
 } from "@/lib/n8n/types";
+import { excludeArchived } from "./filter";
 
 // Thin client over the n8n public REST API (/api/v1). Read-only.
 // Auth via `X-N8N-API-KEY`. Handles cursor pagination.
@@ -50,7 +51,7 @@ export function createN8nClient(baseUrl: string, apiKey: string): N8nClient {
   }
 
   return {
-    listWorkflows: () => getAll<N8nWorkflow>("/workflows"),
+    listWorkflows: async () => excludeArchived(await getAll<N8nWorkflow>("/workflows")),
     getWorkflow: (id: string) => get<N8nWorkflow>(`/workflows/${id}`),
     listExecutions: (limit = 250) =>
       getAll<N8nExecution>("/executions", { limit: String(limit) }),
