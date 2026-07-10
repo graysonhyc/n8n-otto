@@ -60,6 +60,11 @@ export async function getLinksFor(workflowId: string): Promise<ManualLink[]> {
   return rows.map((r) => ({ ...r, relation: r.relation as LinkRelation }));
 }
 
+export async function getAllLinks(): Promise<ManualLink[]> {
+  const rows = await prisma.workflowLink.findMany();
+  return rows.map((r) => ({ ...r, relation: r.relation as LinkRelation }));
+}
+
 export async function addLink(input: {
   fromId: string;
   toId: string;
@@ -141,5 +146,20 @@ export async function setBriefState(
     where: { key },
     create: { key, status },
     update: { status },
+  });
+}
+
+// ---- Process group names (SOP clusters) ------------------------------------
+
+export async function getProcessGroupNames(): Promise<Map<string, string>> {
+  const rows = await prisma.processGroup.findMany();
+  return new Map(rows.map((r) => [r.key, r.name]));
+}
+
+export async function setProcessGroupName(key: string, name: string): Promise<void> {
+  await prisma.processGroup.upsert({
+    where: { key },
+    create: { key, name },
+    update: { name },
   });
 }
