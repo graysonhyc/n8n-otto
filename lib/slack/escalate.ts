@@ -1,8 +1,7 @@
 import "server-only";
 import { getAllOwners, getBriefStates, getSlackInstall } from "@/lib/backoffice/store";
 import { loadDailyBrief } from "@/lib/data/brief";
-import { getMasterChannelId, postBlocks } from "@/lib/slack/post";
-import { resolveRouting } from "@/lib/slack/route";
+import { postBlocks } from "@/lib/slack/post";
 import { briefItemBlocks } from "@/lib/slack/blocks";
 
 export type EscalateResult =
@@ -11,14 +10,12 @@ export type EscalateResult =
 
 // Ownership SLA: high-severity attention items that are still unacknowledged get
 // re-pinged — to the owner's dedicated escalation channel when set, else the
-// owner channel, else master. Runs daily after the brief; "still unacknowledged"
-// is the trigger, so no per-item timers/state are needed.
+// owner channel. Items whose workflow has no channel are skipped (no master
+// channel). Runs daily after the brief; "still unacknowledged" is the trigger,
+// so no per-item timers/state are needed.
 export async function escalateUnacked(): Promise<EscalateResult> {
   const install = await getSlackInstall();
   if (!install) return { ok: false, status: 400, error: "Slack not connected" };
-
-  const master = await getMasterChannelId(install.botToken);
-  if (!master) return { ok: false, status: 400, error: "Could not find #n8n-backoffice channel" };
 
   const [{ attention }, owners, states] = await Promise.all([
     loadDailyBrief(),
@@ -31,8 +28,8 @@ export async function escalateUnacked(): Promise<EscalateResult> {
   let escalated = 0;
   for (const item of pending) {
     const owner = item.workflowId ? owners.get(item.workflowId) ?? null : null;
-    // Prefer the escalation channel; fall back to the owner/master routing.
-    const channelId = owner?.escalationChannelId ?? resolveRouting(owner, master).channelId;
+    const channelId = owner?.escalationChannelId ?? owner?.slackChannelId;
+    if (!channelId) continue; // unowned → skipped
     await postBlocks(
       install.botToken,
       channelId,
