@@ -46,3 +46,4 @@ build.log
 *.db
 *.db-journal
 prisma/dev.db*
+.gstack/
