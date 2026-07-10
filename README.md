@@ -3,8 +3,30 @@
 The operational control room for enterprise automations and AI agents. Reads a
 real n8n instance and turns raw workflows into a business-readable **Registry**,
 per-workflow **Detail** (with auto + manual relationships), a proactive
-**Brief**, and a real **Slack app** that routes alerts/approvals/the daily brief
-to each workflow owner's Slack channel.
+**Brief**, and **Otto** — a bidirectional Slack coworker you `@mention` to ask
+about the estate and take action.
+
+## Otto — the Slack coworker
+
+`@otto` in any channel or thread. Otto reads the thread it's tagged in (Claude-tag
+style), reasons over the derived estate, and answers in-thread — then can act.
+
+Built around the three pillars:
+
+- **Visibility** — `@otto what touches Stripe?` · `what's our estate worth?`
+  (the Value & Waste ledger: hours saved, idle/failing workflows) · `what can
+  issue refunds?` (capability search) · `what changed this week?`
+- **Ownership** — `who owns the Refund Agent?` · `open a Linear ticket for it`
+  (owner + blast radius auto-attached; confirm-gated) · `how's our ownership
+  coverage?` (bus-factor, unowned-critical, stale ownership). Unacknowledged
+  high-severity alerts escalate to owner escalation channels via a daily cron.
+- **Relationship** — `what breaks if the Refund Agent goes down?` (blast radius:
+  downstream workflows + systems + who to notify) · `is the refund process
+  healthy?` (auto-detected process chains + end-to-end health) · `what breaks if
+  we rotate the Stripe key?` (shared-credential change-risk).
+
+Otto never invents facts — every workflow answer comes from a tool over the store.
+Needs `OPENAI_API_KEY` (brain) and `LINEAR_API_KEY` + `LINEAR_TEAM_ID` (ticketing).
 
 > Complements n8n Insights. Insights tells you *how workflows perform*; Backoffice
 > tells you *what they mean, who owns them, what they depend on, and what to do

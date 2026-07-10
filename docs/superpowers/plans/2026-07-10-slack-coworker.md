@@ -4,6 +4,8 @@
 
 **Goal:** Turn the one-way Slack app (brief push + alert push) into a bidirectional coworker: users `@mention` the bot in any channel/thread and it answers questions about the n8n estate and takes ownership actions (file a Linear ticket, assign owner) — every answer/action carrying **owner + blast radius**.
 
+> **STATUS (2026-07-10): SHIPPED — all phases complete.** Phase 0 (foundation), Phase 1 (remediation), Phase 2 (Ask-your-estate depth), Phase 3 (process relationship), plus ownership-coverage + credential change-risk + SLA escalation. 100 tests green, tsc + production build clean, on branch `feat/slack-coworker`. Task 1.5 (n8n replay) resolved as a deep-link — the public REST API has no execution-retry endpoint. Remaining to run live: deploy + update the Slack app from the manifest + set env keys.
+
 **Product feel — "Claude tag":** The coworker must feel like Claude-in-Slack. You `@mention` **Otto** in a thread; it **reads that thread** (the last ~50 messages — mirroring Claude's thread scope), then answers conversationally **in-thread**. The killer case: a user @mentions Otto *inside an alert thread Otto itself posted*, and it answers with owner + blast radius and offers to file a ticket — Claude-tag UX, domain superpower. Follow-ups in the same thread keep context because Otto re-reads the thread each turn (the thread IS the memory — stateless server). While working, Otto shows a visible "on it" state (a placeholder message it later edits, + an `eyes` reaction on the mention). Privacy mirrors Claude tag: only channels Otto is invited to, only the mentioned thread's context.
 
 **Persona:** **Otto** — the n8n Backoffice coworker. Handle `@otto`. Lives only in the system prompt + Slack app display name; swapping the name touches nothing else.
