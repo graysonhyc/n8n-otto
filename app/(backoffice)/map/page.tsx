@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/shell/AppShell";
 import { Chip } from "@/components/ui/Chip";
 import { MapCanvas } from "@/components/map/MapCanvas";
 import { ModeToggle, type RelView } from "@/components/map/ModeToggle";
-import { GroupsBoard } from "@/components/relationships/GroupsBoard";
+import { ProcessTable } from "@/components/relationships/ProcessTable";
 import { loadDeterministic, loadGroups } from "@/lib/data/map";
 
 export const dynamic = "force-dynamic";
@@ -45,26 +45,27 @@ export default async function RelationshipsPage({
     );
   }
 
-  const { sops, workflowsById, unassignedIds, live } = await loadGroups();
+  const groups = await loadGroups();
   return (
     <div className="flex h-full flex-col p-6">
       <PageHeader
         title="Relationships"
         subtitle={
           <>
-            <b className="font-semibold text-ink nums">{sops.length}</b> process group
-            {sops.length === 1 ? "" : "s"} ·{" "}
-            <b className="font-semibold text-ink nums">{unassignedIds.length}</b> unassigned
+            <b className="font-semibold text-ink nums">{groups.rows.length}</b> process
+            {groups.rows.length === 1 ? "" : "es"} ·{" "}
+            <b className="font-semibold text-ink nums">{groups.unassignedCount}</b> of{" "}
+            <b className="font-semibold text-ink nums">{groups.totalWorkflows}</b> workflows unassigned
           </>
         }
         actions={
           <div className="flex items-center gap-2">
             <ModeToggle view={view} />
-            <Chip>{live ? "Live instance" : "Demo data"}</Chip>
+            <Chip>{groups.live ? "Live instance" : "Demo data"}</Chip>
           </div>
         }
       />
-      <GroupsBoard sops={sops} workflowsById={workflowsById} unassignedIds={unassignedIds} live={live} />
+      <ProcessTable {...groups} />
     </div>
   );
 }

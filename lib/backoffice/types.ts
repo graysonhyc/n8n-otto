@@ -44,6 +44,7 @@ export interface Sop {
   id: string;
   name: string;
   description: string | null;
+  updatedAt: string; // ISO
 }
 
 /** A workflow assigned into one SOP at an ordered step ("ticket"). */

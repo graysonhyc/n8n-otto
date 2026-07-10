@@ -153,23 +153,45 @@ export async function setBriefState(
 
 // ---- SOP process groups (hand-authored epic → tickets) ---------------------
 
-/** All SOPs with their members ordered by step position. */
+function toSopWithMembers(r: {
+  id: string;
+  name: string;
+  description: string | null;
+  updatedAt: Date;
+  members: { workflowId: string; groupId: string; position: number }[];
+}): SopWithMembers {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    updatedAt: r.updatedAt.toISOString(),
+    members: r.members
+      .map((m) => ({ workflowId: m.workflowId, groupId: m.groupId, position: m.position }))
+      .sort((a, b) => a.position - b.position),
+  };
+}
+
+/** All SOPs with their members. */
 export async function listSops(): Promise<SopWithMembers[]> {
   const rows = await prisma.processGroup.findMany({
     include: { members: { orderBy: { position: "asc" } } },
     orderBy: { name: "asc" },
   });
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    description: r.description,
-    members: r.members.map((m) => ({ workflowId: m.workflowId, groupId: m.groupId, position: m.position })),
-  }));
+  return rows.map(toSopWithMembers);
+}
+
+/** A single SOP with its members, or null if it does not exist. */
+export async function getSop(id: string): Promise<SopWithMembers | null> {
+  const row = await prisma.processGroup.findUnique({
+    where: { id },
+    include: { members: { orderBy: { position: "asc" } } },
+  });
+  return row ? toSopWithMembers(row) : null;
 }
 
 export async function createSop(name: string): Promise<Sop> {
   const row = await prisma.processGroup.create({ data: { name } });
-  return { id: row.id, name: row.name, description: row.description };
+  return { id: row.id, name: row.name, description: row.description, updatedAt: row.updatedAt.toISOString() };
 }
 
 export async function updateSop(
