@@ -163,3 +163,33 @@ export async function setProcessGroupName(key: string, name: string): Promise<vo
     update: { name },
   });
 }
+
+// ---- Real-time notification state ------------------------------------------
+
+export async function getNotifiedKeys(): Promise<Set<string>> {
+  const rows = await prisma.briefNotification.findMany({ select: { key: true } });
+  return new Set(rows.map((r) => r.key));
+}
+
+export async function markNotified(key: string): Promise<void> {
+  await prisma.briefNotification.upsert({ where: { key }, create: { key }, update: {} });
+}
+
+export async function clearNotified(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  await prisma.briefNotification.deleteMany({ where: { key: { in: keys } } });
+}
+
+export async function getLastSweepAt(): Promise<Date | null> {
+  const row = await prisma.notifySweep.findUnique({ where: { id: "default" } });
+  return row?.lastRunAt ?? null;
+}
+
+export async function touchSweep(): Promise<void> {
+  const now = new Date();
+  await prisma.notifySweep.upsert({
+    where: { id: "default" },
+    create: { id: "default", lastRunAt: now },
+    update: { lastRunAt: now },
+  });
+}

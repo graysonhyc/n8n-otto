@@ -67,3 +67,16 @@ model ProcessGroup {
   name      String
   updatedAt DateTime @updatedAt
 }
+
+/// Per-key "already notified" state for real-time attention alerts. A row means
+/// we've posted this BriefItem; it is deleted when the item resolves (re-arm).
+model BriefNotification {
+  key        String   @id
+  notifiedAt DateTime @default(now())
+}
+
+/// Single-row debounce marker for the notify sweep (id is always "default").
+model NotifySweep {
+  id        String   @id
+  lastRunAt DateTime
+}
