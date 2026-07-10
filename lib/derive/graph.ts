@@ -2,7 +2,7 @@ import type { N8nWorkflow, N8nExecution, WorkflowType } from "@/lib/n8n/types";
 import type { Owner, ManualLink } from "@/lib/backoffice/types";
 import { composeRegistryItem } from "./registry";
 import { workflowCallEdges, sharedCredentialEdges, systemEdges } from "./edges";
-import { computeProcessGroups, type ProcessGroup } from "./process";
+import { computeProcessGroupsMerged, type ProcessGroup } from "./process";
 
 export type ColorBy = "risk" | "type" | "owner";
 
@@ -55,7 +55,7 @@ export function composeGraph(input: ComposeGraphInput): WorkflowGraph {
   const { workflows, executions, owners, links, groupNames, now } = input;
   const ids = new Set(workflows.map((w) => w.id));
 
-  const groups = computeProcessGroups(links, groupNames);
+  const groups = computeProcessGroupsMerged(workflows, links, groupNames);
   const groupByWorkflow = new Map<string, string>();
   for (const g of groups) {
     for (const wid of g.workflowIds) groupByWorkflow.set(wid, g.key);

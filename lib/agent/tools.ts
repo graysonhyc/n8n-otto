@@ -1,8 +1,16 @@
 import type { RegistryItem } from "@/lib/derive/registry";
 import { blastRadius } from "@/lib/derive/blast";
 import { estateLedger } from "@/lib/derive/ledger";
+import { processStatus } from "@/lib/derive/processStatus";
 import { workflowUrlFromEnv, executionsUrlFromEnv } from "@/lib/n8n/links";
 import type { AgentContext } from "./context";
+
+/** Caller→callee pairs from the graph's tier-A call edges. */
+function callPairsOf(ctx: AgentContext): Array<[string, string]> {
+  return ctx.graph.edges
+    .filter((e) => e.kind === "calls")
+    .map((e) => [e.source, e.target] as [string, string]);
+}
 
 // Expand a capability phrase into match keywords, so "can issue refunds" or
 // "touches customer PII" resolve to the systems/tools that imply them.
@@ -232,6 +240,40 @@ const TOOLS: Tool[] = [
             ? `${item.health.recentFailures} recent failure(s) — open the executions view to inspect and retry.`
             : "No recent failures.",
       };
+    },
+  },
+  {
+    name: "list_processes",
+    description:
+      "List the business processes (chains of related workflows, auto-detected from call chains + manual links) with their end-to-end health. Use for 'what processes do we have?', 'which processes are broken?'.",
+    parameters: { type: "object", properties: {} },
+    run: (_args, ctx) => {
+      const pairs = callPairsOf(ctx);
+      const processes = ctx.graph.groups.map((g) => {
+        const s = processStatus(g, ctx.items, pairs);
+        return { key: g.key, name: g.name, steps: s.steps.length, health: s.health, owners: s.owners };
+      });
+      return { count: processes.length, processes };
+    },
+  },
+  {
+    name: "process_status",
+    description:
+      "End-to-end status of one business process: its ordered steps, health (healthy/degraded/stalled), where it's stalled, and the owner teams. Match by process name or by any member workflow name/id. Use for 'is the refund process healthy?', 'what's blocking the onboarding process?'.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", description: "process name or a member workflow name/id" } },
+      required: ["query"],
+    },
+    run: (args, ctx) => {
+      const q = String(args.query ?? "").toLowerCase();
+      const pairs = callPairsOf(ctx);
+      const nameOf = (id: string) => ctx.items.find((i) => i.id === id)?.name.toLowerCase() ?? "";
+      const group =
+        ctx.graph.groups.find((g) => g.name.toLowerCase().includes(q)) ??
+        ctx.graph.groups.find((g) => g.workflowIds.some((id) => id.toLowerCase() === q || nameOf(id).includes(q)));
+      if (!group) return { error: `No process matches "${args.query}". Try list_processes.` };
+      return processStatus(group, ctx.items, pairs);
     },
   },
   {
