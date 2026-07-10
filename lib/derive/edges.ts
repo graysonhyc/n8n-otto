@@ -195,11 +195,23 @@ const SYSTEM_BY_NODE: Record<string, string> = {
 };
 
 /** Resource identifier within a system, when the node params reveal one. */
+// A resource param is either a plain string or an n8n resource-locator object
+// ({ __rl: true, value, mode }). Unwrap the latter to its id, like
+// `referencedWorkflowId` does for Execute-Workflow targets.
+function resolveResource(v: unknown): string | null {
+  if (typeof v === "string") return v.length > 0 ? v : null;
+  if (v && typeof v === "object" && "value" in v) {
+    const inner = (v as { value: unknown }).value;
+    if (typeof inner === "string" && inner.length > 0) return inner;
+  }
+  return null;
+}
+
 function resourceKey(params: Record<string, unknown> | undefined): string | null {
   if (!params) return null;
   for (const key of ["channel", "channelId", "table", "sheetId", "documentId"]) {
-    const v = params[key];
-    if (typeof v === "string" && v.length > 0) return v;
+    const r = resolveResource(params[key]);
+    if (r) return r;
   }
   return null;
 }

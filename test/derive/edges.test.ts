@@ -83,4 +83,25 @@ describe("edge extraction", () => {
     expect(slack!.resource).toBe("#cs-alerts");
     expect(slack!.tier).toBe("B");
   });
+
+  it("unwraps a resource-locator documentId so shared Google Sheets group", () => {
+    // n8n stores the sheet id as { __rl, value } — not a plain string.
+    const sheetNode = (name: string) => ({
+      name,
+      type: "n8n-nodes-base.googleSheets",
+      parameters: { documentId: { __rl: true, mode: "list", value: "SHEET_ABC" } },
+    });
+    const mk = (id: string) => ({
+      id,
+      name: id,
+      active: true,
+      nodes: [sheetNode("gs")],
+      connections: {},
+    });
+    const groups = sharedDataSourceGroups([mk("a"), mk("b")]);
+    const sheet = groups.find((g) => g.resource === "SHEET_ABC");
+    expect(sheet).toBeDefined();
+    expect(sheet!.system).toBe("Google Sheets");
+    expect(sheet!.workflowIds).toEqual(["a", "b"]);
+  });
 });
