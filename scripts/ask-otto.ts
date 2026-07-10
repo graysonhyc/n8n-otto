@@ -11,7 +11,7 @@
  *   pnpm tsx scripts/ask-otto.ts "is the refund process healthy?"
  */
 import { createN8nClient } from "@/lib/n8n/client";
-import { getAllOwners, getAllLinks, getProcessGroupNames } from "@/lib/backoffice/store";
+import { getAllOwners, getAllLinks } from "@/lib/backoffice/store";
 import { composeAgentContext, type AgentContext } from "@/lib/agent/context";
 import { allWorkflows, executions as demoExecutions } from "@/lib/demo/fixtures";
 import { agentToolset } from "@/lib/agent/actions";
@@ -22,11 +22,11 @@ import { runAgent, type ChatClient } from "@/lib/agent/run";
 // Assemble the agent context directly (n8n client + store), bypassing the
 // Next-runtime unstable_cache that buildAgentContext relies on.
 async function loadContext(): Promise<AgentContext> {
-  const [owners, links, groupNames] = await Promise.all([
+  const [owners, links] = await Promise.all([
     getAllOwners(),
     getAllLinks(),
-    getProcessGroupNames(),
   ]);
+  const groupNames = new Map<string, string>();
   const baseUrl = process.env.N8N_BASE_URL;
   const apiKey = process.env.N8N_API_KEY;
   if (baseUrl && apiKey) {

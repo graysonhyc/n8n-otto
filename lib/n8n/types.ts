@@ -62,8 +62,7 @@ export interface N8nExecution {
 export type WorkflowType =
   | "deterministic"
   | "ai-assisted"
-  | "ai-agent-tools"
-  | "human-in-loop";
+  | "ai-agent-tools";
 
 export type TriggerKind =
   | "schedule"

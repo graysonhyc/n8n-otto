@@ -27,13 +27,13 @@ describe("classify", () => {
     expect(c.systems).toEqual(expect.arrayContaining(["Stripe", "HubSpot", "Slack"]));
   });
 
-  it("detects a human-in-the-loop workflow via a wait node", () => {
+  it("surfaces human-in-the-loop as a flag, not its own type", () => {
     const c = classify(ptoApprovalBot);
     expect(c.humanInLoop).toBe(true);
     expect(c.trigger.kind).toBe("form");
-    // uses an LLM but no agent → ai-assisted takes priority label unless HITL is the story;
-    // we surface HITL as its own type here since there is no agent.
-    expect(["ai-assisted", "human-in-loop"]).toContain(c.type);
+    // HITL is a flag now, not a type: an LLM-using workflow with no agent
+    // classifies as ai-assisted regardless of the wait/approval node.
+    expect(c.type).toBe("ai-assisted");
   });
 
   it("reads systems from plain app nodes", () => {

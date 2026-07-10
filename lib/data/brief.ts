@@ -1,7 +1,7 @@
 import "server-only";
 import { loadInstance } from "./source";
 import { runSync } from "./sync";
-import { getAllOwners, getBriefStates, getAllLinks, getProcessGroupNames } from "@/lib/backoffice/store";
+import { getAllOwners, getBriefStates, getAllLinks } from "@/lib/backoffice/store";
 import { composeRegistry } from "@/lib/derive/registry";
 import { credentialGroups } from "@/lib/derive/edges";
 import { composeGraph } from "@/lib/derive/graph";
@@ -47,7 +47,7 @@ export async function loadBrief(): Promise<BriefView> {
       getAllOwners(),
       getBriefStates(),
       getAllLinks(),
-      getProcessGroupNames(),
+      Promise.resolve(new Map<string, string>()),
       runSync(),
     ]);
 
@@ -79,7 +79,7 @@ export async function loadDailyBrief(): Promise<DailyBriefView> {
       getAllOwners(),
       getBriefStates(),
       getAllLinks(),
-      getProcessGroupNames(),
+      Promise.resolve(new Map<string, string>()),
       runSync(),
     ]);
 
@@ -114,7 +114,7 @@ export async function loadChannelBriefs(): Promise<ChannelBriefsView> {
       getAllOwners(),
       getBriefStates(),
       getAllLinks(),
-      getProcessGroupNames(),
+      Promise.resolve(new Map<string, string>()),
       runSync(),
     ]);
 

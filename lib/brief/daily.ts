@@ -40,7 +40,6 @@ const CEST_OFFSET_MIN = 120; // brief runs at 09:00 CEST
 // still shows a plausible (clearly-estimated) number.
 export const TYPE_DEFAULT_MINUTES: Record<WorkflowType, number> = {
   "ai-agent-tools": 15,
-  "human-in-loop": 10,
   "ai-assisted": 8,
   deterministic: 3,
 };

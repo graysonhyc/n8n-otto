@@ -38,3 +38,22 @@ export interface ManualLink {
 }
 
 export type BriefItemStatus = "dismissed" | "acknowledged";
+
+/** A hand-authored SOP ("epic"). */
+export interface Sop {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+/** A workflow assigned into one SOP at an ordered step ("ticket"). */
+export interface SopMember {
+  workflowId: string;
+  groupId: string;
+  position: number;
+}
+
+/** An SOP with its ordered members, as rendered on the Process-groups board. */
+export interface SopWithMembers extends Sop {
+  members: SopMember[];
+}
