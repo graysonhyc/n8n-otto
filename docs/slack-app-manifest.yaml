@@ -32,8 +32,18 @@ oauth_config:
       - channels:read
       - groups:read
       - chat:write
+      # Otto coworker: read @mentions, read the thread it's tagged in, react.
+      - app_mentions:read
+      - channels:history
+      - groups:history
+      - reactions:write
 
 settings:
+  event_subscriptions:
+    # Otto's inbound endpoint. Slack verifies this URL once (url_verification).
+    request_url: https://n8n-backoffice.vercel.app/api/slack/events
+    bot_events:
+      - app_mention
   interactivity:
     is_enabled: true
     request_url: https://n8n-backoffice.vercel.app/api/slack/interactivity

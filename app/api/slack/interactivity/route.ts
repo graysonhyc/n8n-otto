@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifySlackRequest } from "@/lib/slack/verify";
 import { setBriefState, setOwner } from "@/lib/backoffice/store";
+import { linearFromEnv } from "@/lib/linear/client";
+import { buildAgentContext } from "@/lib/agent/load";
+import { blastRadius } from "@/lib/derive/blast";
+import { buildTicket } from "@/lib/linear/ticket";
 
 interface SlackAction {
   action_id: string;
@@ -55,6 +59,31 @@ export async function POST(request: Request) {
     case "rollback_prompt":
       text = "Rollback requested — open the workflow in n8n to restore the previous prompt.";
       break;
+    case "create_ticket": {
+      const linear = linearFromEnv();
+      if (!linear) {
+        text = "Linear isn't configured — set `LINEAR_API_KEY` + `LINEAR_TEAM_ID`.";
+        break;
+      }
+      if (!value.workflowId) {
+        text = "No workflow attached to that action.";
+        break;
+      }
+      try {
+        const ctx = await buildAgentContext();
+        const item = ctx.items.find((i) => i.id === value.workflowId);
+        if (!item) {
+          text = "Couldn't find that workflow anymore.";
+          break;
+        }
+        const blast = blastRadius(item.id, ctx.graph);
+        const issue = await linear.createIssue(buildTicket({ item, blast, changes: [] }));
+        text = `✓ Linear ticket created — ${issue.identifier}: ${issue.url}`;
+      } catch (err) {
+        text = `Couldn't create the ticket: ${err instanceof Error ? err.message : "unknown error"}`;
+      }
+      break;
+    }
     default:
       text = "Opening in n8n…";
   }

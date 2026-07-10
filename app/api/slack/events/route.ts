@@ -7,6 +7,8 @@ import { fetchThreadHistory } from "@/lib/slack/thread";
 import { buildAgentContext } from "@/lib/agent/load";
 import { openaiFromEnv } from "@/lib/agent/openai";
 import { runAgent } from "@/lib/agent/run";
+import { agentToolset } from "@/lib/agent/actions";
+import { linearFromEnv } from "@/lib/linear/client";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +76,15 @@ export async function POST(request: Request) {
         buildAgentContext(),
         fetchThreadHistory(botToken, channel, threadTs, messageTs),
       ]);
-      const { text: answer } = await runAgent({ userText: text, context, client: openai, history });
+      const { tools, runTool } = agentToolset(linearFromEnv());
+      const { text: answer } = await runAgent({
+        userText: text,
+        context,
+        client: openai,
+        history,
+        tools,
+        runTool,
+      });
       await reply(answer || "I didn't find anything to say about that.");
     } catch (err) {
       await reply(`Something went wrong working that out: ${err instanceof Error ? err.message : "unknown error"}`);
