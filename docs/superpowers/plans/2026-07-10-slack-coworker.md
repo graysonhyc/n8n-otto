@@ -4,7 +4,11 @@
 
 **Goal:** Turn the one-way Slack app (brief push + alert push) into a bidirectional coworker: users `@mention` the bot in any channel/thread and it answers questions about the n8n estate and takes ownership actions (file a Linear ticket, assign owner) — every answer/action carrying **owner + blast radius**.
 
-**Architecture:** A new inbound `app_mention` Events endpoint acks Slack in <3s, then runs work in `after()` (Next 16). An OpenAI tool-calling loop (`lib/agent/`) reasons over the existing derived store (`loadInstance` → registry/graph/blast) and n8n API, and replies in-thread via the existing `postBlocks`. Ownership actions call Linear's real API (`@linear/sdk` + `LINEAR_API_KEY`) — **not** the Claude-session MCP, which the deployed server cannot reach. Pure logic (blast radius, ticket-body builder, event parsing, tool routing) is TDD'd; I/O boundaries (Slack, OpenAI, Linear, n8n) are thin and integration-tested.
+**Product feel — "Claude tag":** The coworker must feel like Claude-in-Slack. You `@mention` **Otto** in a thread; it **reads that thread** (the last ~50 messages — mirroring Claude's thread scope), then answers conversationally **in-thread**. The killer case: a user @mentions Otto *inside an alert thread Otto itself posted*, and it answers with owner + blast radius and offers to file a ticket — Claude-tag UX, domain superpower. Follow-ups in the same thread keep context because Otto re-reads the thread each turn (the thread IS the memory — stateless server). While working, Otto shows a visible "on it" state (a placeholder message it later edits, + an `eyes` reaction on the mention). Privacy mirrors Claude tag: only channels Otto is invited to, only the mentioned thread's context.
+
+**Persona:** **Otto** — the n8n Backoffice coworker. Handle `@otto`. Lives only in the system prompt + Slack app display name; swapping the name touches nothing else.
+
+**Architecture:** A new inbound `app_mention` Events endpoint acks Slack in <3s, then runs work in `after()` (Next 16). It fetches the thread's recent messages (`conversations.replies`) and passes them as prior conversation to an OpenAI tool-calling loop (`lib/agent/`), which reasons over the existing derived store (`loadInstance` → registry/graph/blast) and n8n API, and replies in-thread via `chat.postMessage(thread_ts)`. Ownership actions call Linear's real API (`@linear/sdk` + `LINEAR_API_KEY`) — **not** the Claude-session MCP, which the deployed server cannot reach. Pure logic (blast radius, ticket-body builder, event parsing, thread-message mapping, tool routing) is TDD'd; I/O boundaries (Slack, OpenAI, Linear, n8n) are thin and integration-tested.
 
 **Tech Stack:** Next.js 16 (App Router, `after()`), TypeScript, Vitest, `@slack/web-api` (already present), `openai` (already present), `@linear/sdk` (new), Prisma/Postgres store (existing), Zod (existing).
 
@@ -17,7 +21,7 @@
 
 **Pre-req (human, before Task 1):**
 - Branch: `git checkout -b feat/slack-coworker` (repo is on `main` with uncommitted work — commit or stash `lib/data/source.ts`, `lib/demo/fixtures.ts`, `lib/derive/registry.ts`, `lib/n8n/types.ts`, and the untracked `app/(backoffice)/loading.tsx`, `test/brief/daily.test.ts` first so the branch is clean).
-- Slack app: in the manifest (`docs/slack-app-manifest.yaml`) add bot scope `app_mentions:read` and `chat:write`, subscribe to bot event `app_mention`, set the **Event Subscriptions Request URL** to `${APP_BASE_URL}/api/slack/events`. Reinstall the app.
+- Slack app: in the manifest (`docs/slack-app-manifest.yaml`) add bot scopes `app_mentions:read`, `chat:write`, and **`channels:history` + `groups:history`** (to read the thread it's tagged in — the Claude-tag behavior) and **`reactions:write`** (the "on it" `eyes` reaction). Subscribe to bot event `app_mention`. Set the **Event Subscriptions Request URL** to `${APP_BASE_URL}/api/slack/events`. Reinstall the app. Rename the bot display name to **Otto**.
 - Env: add `OPENAI_API_KEY` (agent brain) and `LINEAR_API_KEY` + `LINEAR_TEAM_ID` to `.env.local` and `.env.example`.
 
 ---
