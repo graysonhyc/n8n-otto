@@ -10,7 +10,7 @@ export interface ProcessGroup {
 }
 
 /** Cluster id-pairs into connected components (union-find). */
-function clusterByPairs(pairs: Array<[string, string]>, names: Map<string, string>): ProcessGroup[] {
+export function clusterByPairs(pairs: Array<[string, string]>, names: Map<string, string>): ProcessGroup[] {
   const parent = new Map<string, string>();
   const find = (x: string): string => {
     if (!parent.has(x)) parent.set(x, x);

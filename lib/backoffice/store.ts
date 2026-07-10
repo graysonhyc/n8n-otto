@@ -7,6 +7,7 @@ import type {
   Owner,
   OwnerSource,
   Sop,
+  SopSuggestionStatus,
   SopWithMembers,
 } from "./types";
 
@@ -151,6 +152,24 @@ export async function setBriefState(
   });
 }
 
+// ---- SOP suggestion state ---------------------------------------------------
+
+export async function getSuggestionStates(): Promise<Map<string, SopSuggestionStatus>> {
+  const rows = await prisma.sopSuggestionState.findMany();
+  return new Map(rows.map((r) => [r.id, r.status as SopSuggestionStatus]));
+}
+
+export async function setSuggestionState(
+  id: string,
+  status: SopSuggestionStatus,
+): Promise<void> {
+  await prisma.sopSuggestionState.upsert({
+    where: { id },
+    create: { id, status },
+    update: { status },
+  });
+}
+
 // ---- SOP process groups (hand-authored epic → tickets) ---------------------
 
 function toSopWithMembers(r: {
@@ -189,8 +208,9 @@ export async function getSop(id: string): Promise<SopWithMembers | null> {
   return row ? toSopWithMembers(row) : null;
 }
 
-export async function createSop(name: string): Promise<Sop> {
+export async function createSop(name: string, memberIds: string[] = []): Promise<Sop> {
   const row = await prisma.processGroup.create({ data: { name } });
+  for (let i = 0; i < memberIds.length; i++) await assignMember(memberIds[i], row.id, i);
   return { id: row.id, name: row.name, description: row.description, updatedAt: row.updatedAt.toISOString() };
 }
 

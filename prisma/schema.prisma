@@ -95,3 +95,11 @@ model NotifySweep {
   id        String   @id
   lastRunAt DateTime
 }
+
+/// Dismissed / notified state for an auto-generated SOP suggestion. `id` is the
+/// stable suggestion hash (see lib/derive/suggestions.ts). No row = never acted on.
+model SopSuggestionState {
+  id        String   @id
+  status    String // dismissed | notified
+  updatedAt DateTime @updatedAt
+}

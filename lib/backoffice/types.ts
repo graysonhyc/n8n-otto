@@ -39,6 +39,8 @@ export interface ManualLink {
 
 export type BriefItemStatus = "dismissed" | "acknowledged";
 
+export type SopSuggestionStatus = "dismissed" | "notified";
+
 /** A hand-authored SOP ("epic"). */
 export interface Sop {
   id: string;
