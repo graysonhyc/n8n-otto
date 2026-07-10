@@ -2,35 +2,11 @@ import "server-only";
 import { loadInstance } from "./source";
 import { getAllOwners, getSop, getSuggestionStates, listSops } from "@/lib/backoffice/store";
 import { buildClusters, classifySuggestions, type SopSuggestion } from "@/lib/derive/suggestions";
-import {
-  composeDeterministic,
-  type WorkflowGraph,
-  type WorkflowGraphNode,
-} from "@/lib/derive/graph";
+import type { WorkflowGraphNode } from "@/lib/derive/graph";
 import { composeRegistryItem } from "@/lib/derive/registry";
 import type { Sop } from "@/lib/backoffice/types";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner } from "@/lib/backoffice/types";
-
-export interface DeterministicLayers {
-  dataSources: boolean;
-  credentials: boolean;
-}
-
-export interface DeterministicView {
-  graph: WorkflowGraph;
-  live: boolean;
-}
-
-/** The auto-parsed relationship graph for `?view=auto`. */
-export async function loadDeterministic(layers: DeterministicLayers): Promise<DeterministicView> {
-  const [{ workflows, executions, live }, owners] = await Promise.all([
-    loadInstance(),
-    getAllOwners(),
-  ]);
-  const graph = composeDeterministic({ workflows, executions, owners, now: Date.now(), layers });
-  return { graph, live };
-}
 
 export type BoardWorkflow = WorkflowGraphNode;
 

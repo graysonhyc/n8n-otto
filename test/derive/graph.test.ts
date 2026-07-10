@@ -1,14 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { composeDeterministic, composeGraph } from "@/lib/derive/graph";
+import { composeGraph } from "@/lib/derive/graph";
 import {
-  contentOrchestrator,
   customerOnboarding,
-  formatPost,
   welcomeEmailAgent,
   leadRouting,
   refundReviewAgent,
-  syncLinkedin,
-  syncYoutube,
   executions,
 } from "@/lib/demo/fixtures";
 import type { ManualLink } from "@/lib/backoffice/types";
@@ -93,51 +89,5 @@ describe("composeGraph", () => {
     const g = composeGraph({ ...baseInput(), workflows: [customerOnboarding] });
     // welcome_email_agent absent → the calls edge must be dropped
     expect(g.edges.some((e) => e.kind === "calls")).toBe(false);
-  });
-});
-
-describe("composeDeterministic", () => {
-  const pipeline = [formatPost, syncYoutube, syncLinkedin, contentOrchestrator, customerOnboarding, welcomeEmailAgent];
-  const detInput = (layers: { dataSources: boolean; credentials: boolean }) => ({
-    workflows: pipeline,
-    executions,
-    owners: new Map(),
-    now: Date.parse("2026-07-09T15:00:00.000Z"),
-    layers,
-  });
-
-  it("default (no layers) = dependency skeleton only, no hub nodes", () => {
-    const g = composeDeterministic(detInput({ dataSources: false, credentials: false }));
-    expect(g.nodes.every((n) => n.kind === "workflow")).toBe(true);
-    expect(g.edges.every((e) => e.kind === "calls" || e.kind === "subworkflow-tool")).toBe(true);
-    // subworkflow-as-tool: content orchestrator → format post
-    expect(g.edges.some((e) => e.kind === "subworkflow-tool" && e.source === "wf_content_orchestrator" && e.target === "wf_format_post")).toBe(true);
-    // plain call: customer onboarding → welcome email
-    expect(g.edges.some((e) => e.kind === "calls" && e.source === "wf_customer_onboarding" && e.target === "wf_welcome_email_agent")).toBe(true);
-  });
-
-  it("data-source layer adds resource hubs, never pairwise credential edges", () => {
-    const g = composeDeterministic(detInput({ dataSources: true, credentials: false }));
-    const hub = g.nodes.find((n) => n.kind === "resource" && n.name === "sheet_content_calendar");
-    expect(hub).toBeDefined();
-    // both syncers spoke into the one hub
-    const spokes = g.edges.filter((e) => e.kind === "uses-resource" && e.target === hub!.id);
-    expect(spokes.map((e) => e.source).sort()).toEqual(["wf_sync_linkedin", "wf_sync_youtube"]);
-    expect(g.edges.some((e) => e.kind === "shares-credential")).toBe(false);
-  });
-
-  it("credential layer adds credential hubs", () => {
-    const g = composeDeterministic(detInput({ dataSources: false, credentials: true }));
-    expect(g.nodes.some((n) => n.kind === "credential")).toBe(true);
-    // every uses-credential spoke targets an existing credential hub
-    const credIds = new Set(g.nodes.filter((n) => n.kind === "credential").map((n) => n.id));
-    for (const e of g.edges.filter((e) => e.kind === "uses-credential")) {
-      expect(credIds.has(e.target)).toBe(true);
-    }
-  });
-
-  it("skips subworkflow-tool edges whose target is absent from the set", () => {
-    const g = composeDeterministic({ ...detInput({ dataSources: false, credentials: false }), workflows: [contentOrchestrator] });
-    expect(g.edges.some((e) => e.kind === "subworkflow-tool")).toBe(false);
   });
 });
