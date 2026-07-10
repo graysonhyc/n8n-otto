@@ -1,5 +1,6 @@
 import type { RegistryItem } from "@/lib/derive/registry";
 import type { ChangeEvent } from "@/lib/diff/snapshot";
+import type { BlastRadius } from "@/lib/derive/blast";
 
 export type Severity = "high" | "medium" | "low";
 
@@ -31,7 +32,15 @@ function truncate(s: string, n = 90): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
-function promptItem(item: RegistryItem, change: Extract<ChangeEvent, { kind: "prompt" }>): BriefItem {
+function withBlast(base: string, note: string | null): string {
+  return note ? `${base} ${note}` : base;
+}
+
+function promptItem(
+  item: RegistryItem,
+  change: Extract<ChangeEvent, { kind: "prompt" }>,
+  blastNote: string | null = null,
+): BriefItem {
   const becameDecision = DECISION_RE.test(change.new) && SUMMARISE_RE.test(change.old);
   const severity: Severity = becameDecision || item.hasToolAccess ? "high" : "medium";
   return {
@@ -40,9 +49,12 @@ function promptItem(item: RegistryItem, change: Extract<ChangeEvent, { kind: "pr
     category: "change",
     title: `${item.name} changed behaviour`,
     whatHappened: `Prompt changed from “${truncate(change.old)}” to “${truncate(change.new)}”.`,
-    whyItMatters: becameDecision
-      ? "Moved from information retrieval to customer-impacting decision support."
-      : "Behaviour changed; review before continued production use.",
+    whyItMatters: withBlast(
+      becameDecision
+        ? "Moved from information retrieval to customer-impacting decision support."
+        : "Behaviour changed; review before continued production use.",
+      blastNote,
+    ),
     suggestedOwner: item.owner?.team ?? "Unassigned",
     recommendedAction: "Request approval before production use.",
     workflowId: item.id,
@@ -50,7 +62,7 @@ function promptItem(item: RegistryItem, change: Extract<ChangeEvent, { kind: "pr
   };
 }
 
-function incidentItem(item: RegistryItem): BriefItem | null {
+function incidentItem(item: RegistryItem, blastNote: string | null = null): BriefItem | null {
   if (item.health.recentFailures < 3) return null;
   return {
     key: `incident:${item.id}:failures`,
@@ -60,7 +72,7 @@ function incidentItem(item: RegistryItem): BriefItem | null {
     whatHappened: `${item.health.recentFailures} failed executions${
       item.systems.length ? ` — may affect ${item.systems.join(", ")}` : ""
     }.`,
-    whyItMatters: "Downstream steps and dependent workflows may be blocked.",
+    whyItMatters: withBlast("Downstream steps and dependent workflows may be blocked.", blastNote),
     suggestedOwner: item.owner?.team ?? item.project ?? "Unassigned",
     recommendedAction: "Check the connection, then replay failed executions.",
     workflowId: item.id,
@@ -145,21 +157,39 @@ function sharedCredentialItem(
   };
 }
 
+// One-line "who else is affected" note from a workflow's blast radius, or null
+// when there is no known downstream impact (nothing worth adding to the item).
+function blastNoteFor(blast: BlastRadius | undefined, names: Map<string, string>): string | null {
+  if (!blast) return null;
+  const parts: string[] = [];
+  if (blast.downstreamWorkflowIds.length) {
+    const shown = blast.downstreamWorkflowIds.slice(0, 2).map((id) => names.get(id) ?? id).join(", ");
+    const more = blast.downstreamWorkflowIds.length - 2;
+    parts.push(`Blocks ${shown}${more > 0 ? ` +${more} more` : ""}`);
+  }
+  if (blast.processGroup) parts.push(`part of ${blast.processGroup.name}`);
+  if (!parts.length) return null;
+  const teams = blast.affectedOwnerTeams.length ? ` Notify: ${blast.affectedOwnerTeams.join(", ")}.` : "";
+  return `Blast radius: ${parts.join("; ")}.${teams}`;
+}
+
 export function buildBrief(input: {
   items: RegistryItem[];
   changes: Map<string, ChangeEvent[]>;
   sharedCredentials: SharedCredentialInfo[];
+  blastById?: Map<string, BlastRadius>;
 }): BriefItem[] {
   const names = new Map(input.items.map((i) => [i.id, i.name]));
   const out: BriefItem[] = [];
 
   for (const item of input.items) {
+    const note = blastNoteFor(input.blastById?.get(item.id), names);
     for (const change of input.changes.get(item.id) ?? []) {
-      if (change.kind === "prompt") out.push(promptItem(item, change));
+      if (change.kind === "prompt") out.push(promptItem(item, change, note));
     }
     const dangling = danglingItem(item);
     if (dangling) out.push(dangling);
-    const incident = incidentItem(item);
+    const incident = incidentItem(item, note);
     if (incident) out.push(incident);
     const own = ownershipItem(item);
     if (own) out.push(own);
