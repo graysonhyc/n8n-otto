@@ -59,3 +59,11 @@ model BriefItemState {
   status    String // dismissed | acknowledged
   updatedAt DateTime @updatedAt
 }
+
+/// Human-given name for an SOP process cluster. `key` is a canonical hash of the
+/// sorted member workflow ids (membership itself lives in the part-of-process links).
+model ProcessGroup {
+  key       String   @id
+  name      String
+  updatedAt DateTime @updatedAt
+}
