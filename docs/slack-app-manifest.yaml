@@ -13,14 +13,14 @@
 # https://<your-domain>/api/slack/interactivity, then reinstall.
 
 display_information:
-  name: n8n Backoffice
-  description: Operational alerts, approvals, and the daily brief for your n8n automations.
+  name: n8n Otto
+  description: Your n8n automation coworker — @mention to ask about the estate, owners, and blast radius, and to take action.
   background_color: "#ea4b71"
 
 features:
   bot_user:
     # display_name allows only a-z 0-9 - _ .  (no spaces, no uppercase)
-    display_name: n8n-backoffice
+    display_name: n8n-otto
     always_online: true
 
 oauth_config:

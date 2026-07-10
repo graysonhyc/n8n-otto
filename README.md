@@ -8,12 +8,12 @@ about the estate and take action.
 
 ## Otto — the Slack coworker
 
-`@otto` in any channel or thread. Otto reads the thread it's tagged in (Claude-tag
+`@n8n-otto` in any channel or thread. Otto reads the thread it's tagged in (Claude-tag
 style), reasons over the derived estate, and answers in-thread — then can act.
 
 Built around the three pillars:
 
-- **Visibility** — `@otto what touches Stripe?` · `what's our estate worth?`
+- **Visibility** — `@n8n-otto what touches Stripe?` · `what's our estate worth?`
   (the Value & Waste ledger: hours saved, idle/failing workflows) · `what can
   issue refunds?` (capability search) · `what changed this week?`
 - **Ownership** — `who owns the Refund Agent?` · `open a Linear ticket for it`

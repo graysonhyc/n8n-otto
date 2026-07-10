@@ -77,8 +77,10 @@ export async function POST(request: Request) {
         fetchThreadHistory(botToken, channel, threadTs, messageTs),
       ]);
       const { tools, runTool } = agentToolset(linearFromEnv());
+      // A bare "@n8n-otto" with no question → introduce + suggest actions.
+      const userText = text || "The user tagged you with no question. Introduce yourself and suggest what I can ask.";
       const { text: answer } = await runAgent({
-        userText: text,
+        userText,
         context,
         client: openai,
         history,
