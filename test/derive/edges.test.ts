@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   agentToolEdges,
   sharedCredentialEdges,
+  sharedDataSourceGroups,
+  subworkflowToolEdges,
   systemEdges,
   workflowCallEdges,
 } from "@/lib/derive/edges";
 import {
+  allWorkflows,
+  contentOrchestrator,
   customerOnboarding,
   leadRouting,
   refundReviewAgent,
@@ -42,6 +46,34 @@ describe("edge extraction", () => {
       "wf_lead_routing",
     ]);
     expect(shared!.tier).toBe("A");
+  });
+
+  it("Tier A: subworkflow-as-tool from a toolWorkflow wired into an agent", () => {
+    const edges = subworkflowToolEdges(contentOrchestrator);
+    expect(edges).toContainEqual({
+      from: "wf_content_orchestrator",
+      to: "wf_format_post",
+      kind: "subworkflow-tool",
+      tier: "A",
+    });
+  });
+
+  it("no subworkflow-tool edges when there is no agent", () => {
+    expect(subworkflowToolEdges(customerOnboarding)).toEqual([]);
+  });
+
+  it("groups workflows that touch the same resource id into one hub", () => {
+    const groups = sharedDataSourceGroups(allWorkflows);
+    const sheet = groups.find((g) => g.resource === "sheet_content_calendar");
+    expect(sheet).toBeDefined();
+    expect(sheet!.system).toBe("Google Sheets");
+    expect(sheet!.workflowIds).toEqual(["wf_sync_linkedin", "wf_sync_youtube"]);
+  });
+
+  it("does not group a resource touched by only one workflow", () => {
+    const groups = sharedDataSourceGroups(allWorkflows);
+    // "#finance" is used solely by the revenue report agent → no hub.
+    expect(groups.find((g) => g.resource === "#finance")).toBeUndefined();
   });
 
   it("Tier B: workflow → system resource (Slack channel)", () => {

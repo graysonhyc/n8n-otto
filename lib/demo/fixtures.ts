@@ -165,6 +165,80 @@ export const revenueReportAgent: N8nWorkflow = {
   },
 };
 
+// ---- Content pipeline: shared-data-source + subworkflow-as-tool anchors ------
+// "Sync YouTube" and "Sync LinkedIn" are related because they read/write the
+// SAME Google Sheet (the content calendar) — a deterministic shared-data-source
+// hub. "Content Orchestrator" (an agent) uses "Format Post" as a subworkflow
+// tool — a deterministic subworkflow-as-tool dependency.
+
+export const formatPost: N8nWorkflow = {
+  id: "wf_format_post",
+  name: "Format Post",
+  active: true,
+  tags: [{ name: "production" }, { name: "marketing" }],
+  homeProject: { id: "prj_marketing", name: "Marketing" },
+  updatedAt: "2026-06-15T10:00:00.000Z",
+  nodes: [
+    { name: "When called", type: "n8n-nodes-base.executeWorkflowTrigger" },
+    { name: "Format", type: "n8n-nodes-base.set", parameters: {} },
+  ],
+  connections: {
+    "When called": { main: [[{ node: "Format", type: "main", index: 0 }]] },
+  },
+};
+
+export const syncYoutube: N8nWorkflow = {
+  id: "wf_sync_youtube",
+  name: "Sync YouTube",
+  active: true,
+  tags: [{ name: "production" }, { name: "marketing" }],
+  homeProject: { id: "prj_marketing", name: "Marketing" },
+  updatedAt: "2026-07-01T10:00:00.000Z",
+  nodes: [
+    { name: "Every hour", type: "n8n-nodes-base.scheduleTrigger", parameters: { rule: { interval: [{ field: "hours" }] } } },
+    { name: "Content calendar", type: "n8n-nodes-base.googleSheets", parameters: { documentId: "sheet_content_calendar", sheetName: "Calendar" }, credentials: { googleSheetsOAuth2Api: { id: "cred_gsheets", name: "Google Sheets" } } },
+  ],
+  connections: {
+    "Every hour": { main: [[{ node: "Content calendar", type: "main", index: 0 }]] },
+  },
+};
+
+export const syncLinkedin: N8nWorkflow = {
+  id: "wf_sync_linkedin",
+  name: "Sync LinkedIn",
+  active: true,
+  tags: [{ name: "production" }, { name: "marketing" }],
+  homeProject: { id: "prj_marketing", name: "Marketing" },
+  updatedAt: "2026-07-01T11:00:00.000Z",
+  nodes: [
+    { name: "Every hour", type: "n8n-nodes-base.scheduleTrigger", parameters: { rule: { interval: [{ field: "hours" }] } } },
+    { name: "Content calendar", type: "n8n-nodes-base.googleSheets", parameters: { documentId: "sheet_content_calendar", sheetName: "Calendar" }, credentials: { googleSheetsOAuth2Api: { id: "cred_gsheets", name: "Google Sheets" } } },
+  ],
+  connections: {
+    "Every hour": { main: [[{ node: "Content calendar", type: "main", index: 0 }]] },
+  },
+};
+
+export const contentOrchestrator: N8nWorkflow = {
+  id: "wf_content_orchestrator",
+  name: "Content Orchestrator",
+  active: true,
+  tags: [{ name: "production" }, { name: "marketing" }],
+  homeProject: { id: "prj_marketing", name: "Marketing" },
+  updatedAt: "2026-07-02T10:00:00.000Z",
+  nodes: [
+    { name: "Chat", type: "@n8n/n8n-nodes-langchain.chatTrigger" },
+    { name: "Content Orchestrator", type: "@n8n/n8n-nodes-langchain.agent", parameters: { options: { systemMessage: "Draft and schedule cross-platform posts." } } },
+    { name: "OpenAI GPT-4o", type: "@n8n/n8n-nodes-langchain.lmChatOpenAi", parameters: { model: "gpt-4o" } },
+    { name: "Format Post", type: "@n8n/n8n-nodes-langchain.toolWorkflow", parameters: { workflowId: { value: "wf_format_post" } } },
+  ],
+  connections: {
+    Chat: { main: [[{ node: "Content Orchestrator", type: "main", index: 0 }]] },
+    "OpenAI GPT-4o": { ai_languageModel: [[{ node: "Content Orchestrator", type: "ai_languageModel", index: 0 }]] },
+    "Format Post": { ai_tool: [[{ node: "Content Orchestrator", type: "ai_tool", index: 0 }]] },
+  },
+};
+
 export const allWorkflows: N8nWorkflow[] = [
   refundReviewAgent,
   customerOnboarding,
@@ -172,6 +246,10 @@ export const allWorkflows: N8nWorkflow[] = [
   leadRouting,
   ptoApprovalBot,
   revenueReportAgent,
+  formatPost,
+  syncYoutube,
+  syncLinkedin,
+  contentOrchestrator,
 ];
 
 // Builds N successful executions for a workflow on 2026-07-09, spaced through the
