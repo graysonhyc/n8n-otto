@@ -1,5 +1,5 @@
 import "server-only";
-import { getSlackInstall } from "@/lib/backoffice/store";
+import { getSlackInstall, markNotified } from "@/lib/backoffice/store";
 import { loadChannelBriefs } from "@/lib/data/brief";
 import { postBlocks } from "@/lib/slack/post";
 import { briefItemBlocks, briefFooterBlock } from "@/lib/slack/blocks";
@@ -37,6 +37,8 @@ export async function sendDailyBrief(): Promise<SendBriefResult> {
     );
     for (const item of ch.attention) {
       await postBlocks(install.botToken, ch.channelId, briefItemBlocks(item), item.title);
+      // Record so the real-time notify sweep never re-posts what the digest sent.
+      await markNotified(item.key);
       posted++;
     }
   }
