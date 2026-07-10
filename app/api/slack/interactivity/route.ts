@@ -5,6 +5,7 @@ import { linearFromEnv } from "@/lib/linear/client";
 import { buildAgentContext } from "@/lib/agent/load";
 import { blastRadius } from "@/lib/derive/blast";
 import { buildTicket } from "@/lib/linear/ticket";
+import { workflowUrlFromEnv } from "@/lib/n8n/links";
 
 interface SlackAction {
   action_id: string;
@@ -56,6 +57,11 @@ export async function POST(request: Request) {
     case "reject_owner":
       text = "Noted — owner suggestion rejected.";
       break;
+    case "open_in_n8n": {
+      const url = value.workflowId ? workflowUrlFromEnv(value.workflowId) : null;
+      text = url ? `Open in n8n: ${url}` : "n8n base URL isn't configured.";
+      break;
+    }
     case "rollback_prompt":
       text = "Rollback requested — open the workflow in n8n to restore the previous prompt.";
       break;

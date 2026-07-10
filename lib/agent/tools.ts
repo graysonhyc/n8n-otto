@@ -1,5 +1,6 @@
 import type { RegistryItem } from "@/lib/derive/registry";
 import { blastRadius } from "@/lib/derive/blast";
+import { workflowUrlFromEnv, executionsUrlFromEnv } from "@/lib/n8n/links";
 import type { AgentContext } from "./context";
 
 // Read-only tools the coworker can call. Each is a pure function of
@@ -125,6 +126,30 @@ const TOOLS: Tool[] = [
         systems: b.systems,
         processGroup: b.processGroup ? b.processGroup.name : null,
         affectedOwnerTeams: b.affectedOwnerTeams,
+      };
+    },
+  },
+  {
+    name: "open_in_n8n",
+    description:
+      "Get the n8n editor + executions deep-links for a workflow. Use for 'open X in n8n' and for replaying failures — n8n has no API retry, so point the user to the executions view to retry by hand.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+    },
+    run: (args, ctx) => {
+      const id = String(args.id ?? "");
+      const item = ctx.items.find((i) => i.id === id);
+      if (!item) return { error: `No workflow with id ${id}` };
+      return {
+        name: item.name,
+        editor: workflowUrlFromEnv(id),
+        executions: executionsUrlFromEnv(id),
+        note:
+          item.health.recentFailures > 0
+            ? `${item.health.recentFailures} recent failure(s) — open the executions view to inspect and retry.`
+            : "No recent failures.",
       };
     },
   },
