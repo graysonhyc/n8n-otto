@@ -6,20 +6,33 @@ import { sharedDataSourceGroups } from "./edges";
 export type SuggestionConfidence = "strong" | "possible";
 export type SuggestionKind = "new-sop" | "add-to-sop";
 
+/** Why a set of workflows is connected — the deterministic ground truth. */
+export interface ClusterBasis {
+  viaCalls: boolean; // one workflow calls another (Execute Workflow)
+  sharedResource: { system: string; name: string } | null; // same sheet/table/channel
+}
+
 export interface SopSuggestion {
   id: string; // stable: hash(sorted memberIds + kind + targetSopId)
   kind: SuggestionKind;
   confidence: SuggestionConfidence;
   memberIds: string[]; // sorted; for add-to-sop, the MISSING members only
-  reason: string;
+  reason: string; // short deterministic label (fallback / Slack notification text)
   targetSopId: string | null; // set iff add-to-sop
   targetSopName: string | null;
+  basis: ClusterBasis;
+  // Enrichment attached by the server layer (lib/data/suggestions). Optional so
+  // the pure classifier stays LLM-free and unit-testable.
+  memberNames?: string[];
+  rationale?: string; // LLM (or deterministic-fallback) "why this is an SOP"
+  factLine?: string; // deterministic ground-truth footer
 }
 
 export interface Cluster {
   memberIds: string[];
   confidence: SuggestionConfidence;
   reason: string;
+  basis: ClusterBasis;
 }
 
 export interface SuggestionInput {
@@ -67,6 +80,7 @@ export function classifySuggestions(input: SuggestionInput): SopSuggestion[] {
         reason: cluster.reason,
         targetSopId: null,
         targetSopName: null,
+        basis: cluster.basis,
       };
     } else {
       const [targetSopId, targetSopName] = [...sops.entries()][0];
@@ -81,6 +95,7 @@ export function classifySuggestions(input: SuggestionInput): SopSuggestion[] {
         reason: cluster.reason,
         targetSopId,
         targetSopName,
+        basis: cluster.basis,
       };
     }
     if (!input.dismissed.has(s.id)) out.push(s);
@@ -104,13 +119,9 @@ export function buildClusters(workflows: N8nWorkflow[]): Cluster[] {
 
   const dsGroups = sharedDataSourceGroups(workflows);
   const dsPairs: Array<[string, string]> = [];
-  const dsReason = new Map<string, string>(); // pairKey -> "share System:resource"
   for (const g of dsGroups) {
     const [head, ...rest] = g.workflowIds;
-    for (const id of rest) {
-      dsPairs.push([head, id]);
-      dsReason.set(pairKey(head, id), `share ${g.system}:${g.resource}`);
-    }
+    for (const id of rest) dsPairs.push([head, id]);
   }
 
   const groups = clusterByPairs([...callPairs, ...dsPairs], new Map());
@@ -119,18 +130,31 @@ export function buildClusters(workflows: N8nWorkflow[]): Cluster[] {
     .filter((grp) => grp.workflowIds.length >= 2)
     .map((grp) => {
       const ids = grp.workflowIds;
-      let strong = false;
-      for (let i = 0; i < ids.length && !strong; i++) {
+      const idSet = new Set(ids);
+      let viaCalls = false;
+      for (let i = 0; i < ids.length && !viaCalls; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           if (callSet.has(pairKey(ids[i], ids[j]))) {
-            strong = true;
+            viaCalls = true;
             break;
           }
         }
       }
-      const reason = strong
+      // The shared resource behind this cluster: a data-source group fully inside it.
+      const dsg = dsGroups.find((g) => g.workflowIds.every((w) => idSet.has(w)));
+      const sharedResource = dsg ? { system: dsg.system, name: dsg.resourceName } : null;
+
+      const reason = viaCalls
         ? `${ids.length} workflows call each other`
-        : dsReason.get(pairKey(ids[0], ids[1])) ?? "share a data source";
-      return { memberIds: ids, confidence: strong ? ("strong" as const) : ("possible" as const), reason };
+        : sharedResource
+          ? `share ${sharedResource.system}: ${sharedResource.name}`
+          : "share a data source";
+
+      return {
+        memberIds: ids,
+        confidence: viaCalls ? ("strong" as const) : ("possible" as const),
+        reason,
+        basis: { viaCalls, sharedResource },
+      };
     });
 }

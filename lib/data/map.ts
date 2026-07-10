@@ -2,6 +2,7 @@ import "server-only";
 import { loadInstance } from "./source";
 import { getAllOwners, getSop, getSuggestionStates, listSops } from "@/lib/backoffice/store";
 import { buildClusters, classifySuggestions, type SopSuggestion } from "@/lib/derive/suggestions";
+import { enrichSuggestions } from "./suggestions";
 import type { WorkflowGraphNode } from "@/lib/derive/graph";
 import { composeRegistryItem } from "@/lib/derive/registry";
 import type { Sop } from "@/lib/backoffice/types";
@@ -69,15 +70,17 @@ export interface SuggestionsView {
  * sources) that aren't yet an SOP, minus any the team has dismissed.
  */
 export async function loadSuggestions(): Promise<SuggestionsView> {
-  const [{ workflows }, sops, states] = await Promise.all([
+  const [{ workflows, executions }, owners, sops, states] = await Promise.all([
     loadInstance(),
+    getAllOwners(),
     listSops(),
     getSuggestionStates(),
   ]);
   const sopByWorkflow = new Map<string, { id: string; name: string }>();
   for (const s of sops) for (const m of s.members) sopByWorkflow.set(m.workflowId, { id: s.id, name: s.name });
   const dismissed = new Set([...states].filter(([, v]) => v === "dismissed").map(([k]) => k));
-  const suggestions = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed });
+  const raw = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed });
+  const suggestions = await enrichSuggestions(raw, { workflows, executions, owners });
   return { suggestions };
 }
 

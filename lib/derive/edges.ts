@@ -207,11 +207,27 @@ function resolveResource(v: unknown): string | null {
   return null;
 }
 
+const RESOURCE_KEYS = ["channel", "channelId", "table", "sheetId", "documentId"];
+
 function resourceKey(params: Record<string, unknown> | undefined): string | null {
   if (!params) return null;
-  for (const key of ["channel", "channelId", "table", "sheetId", "documentId"]) {
+  for (const key of RESOURCE_KEYS) {
     const r = resolveResource(params[key]);
     if (r) return r;
+  }
+  return null;
+}
+
+// The human label n8n caches for a resource-locator (e.g. a sheet's title),
+// used for display where the raw id is meaningless. Null when absent.
+function resourceDisplayName(params: Record<string, unknown> | undefined): string | null {
+  if (!params) return null;
+  for (const key of RESOURCE_KEYS) {
+    const v = params[key];
+    if (v && typeof v === "object" && "cachedResultName" in v) {
+      const name = (v as { cachedResultName: unknown }).cachedResultName;
+      if (typeof name === "string" && name.length > 0) return name;
+    }
   }
   return null;
 }
@@ -237,7 +253,8 @@ export function systemEdges(workflow: N8nWorkflow): SystemEdge[] {
 export interface DataSourceGroup {
   id: string; // "res:<system>:<resource>"
   system: string;
-  resource: string;
+  resource: string; // the raw id (stable key)
+  resourceName: string; // human label (cachedResultName) or the raw id if none
   workflowIds: string[]; // sorted, length >= 2
 }
 
@@ -248,7 +265,7 @@ export interface DataSourceGroup {
  * the resource id comes straight from node parameters via `resourceKey`.
  */
 export function sharedDataSourceGroups(workflows: N8nWorkflow[]): DataSourceGroup[] {
-  const byRes = new Map<string, { system: string; resource: string; ids: Set<string> }>();
+  const byRes = new Map<string, { system: string; resource: string; name: string | null; ids: Set<string> }>();
   for (const wf of workflows) {
     for (const node of wf.nodes) {
       const base = baseName(node.type);
@@ -257,12 +274,19 @@ export function sharedDataSourceGroups(workflows: N8nWorkflow[]): DataSourceGrou
       const resource = resourceKey(node.parameters);
       if (!system || !resource) continue;
       const key = `res:${system}:${resource}`;
-      const entry = byRes.get(key) ?? { system, resource, ids: new Set<string>() };
+      const entry = byRes.get(key) ?? { system, resource, name: null, ids: new Set<string>() };
+      entry.name = entry.name ?? resourceDisplayName(node.parameters);
       entry.ids.add(wf.id);
       byRes.set(key, entry);
     }
   }
   return [...byRes.entries()]
     .filter(([, v]) => v.ids.size >= 2)
-    .map(([id, v]) => ({ id, system: v.system, resource: v.resource, workflowIds: [...v.ids].sort() }));
+    .map(([id, v]) => ({
+      id,
+      system: v.system,
+      resource: v.resource,
+      resourceName: v.name ?? v.resource,
+      workflowIds: [...v.ids].sort(),
+    }));
 }

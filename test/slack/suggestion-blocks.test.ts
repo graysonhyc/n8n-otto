@@ -10,6 +10,7 @@ const newSop: SopSuggestion = {
   reason: "3 workflows call each other",
   targetSopId: null,
   targetSopName: null,
+  basis: { viaCalls: true, sharedResource: null },
 };
 
 const addToSop: SopSuggestion = {
@@ -17,9 +18,10 @@ const addToSop: SopSuggestion = {
   kind: "add-to-sop",
   confidence: "possible",
   memberIds: ["d"],
-  reason: "share Postgres:orders",
+  reason: "share Postgres: orders",
   targetSopId: "s1",
   targetSopName: "Refunds",
+  basis: { viaCalls: false, sharedResource: { system: "Postgres", name: "orders" } },
 };
 
 // Pull the action elements out of the blocks for assertions.

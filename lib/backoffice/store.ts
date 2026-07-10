@@ -170,6 +170,19 @@ export async function setSuggestionState(
   });
 }
 
+export async function getSuggestionReasons(): Promise<Map<string, string>> {
+  const rows = await prisma.sopSuggestionReason.findMany();
+  return new Map(rows.map((r) => [r.id, r.rationale]));
+}
+
+export async function setSuggestionReason(id: string, rationale: string): Promise<void> {
+  await prisma.sopSuggestionReason.upsert({
+    where: { id },
+    create: { id, rationale },
+    update: { rationale },
+  });
+}
+
 // ---- SOP process groups (hand-authored epic → tickets) ---------------------
 
 function toSopWithMembers(r: {

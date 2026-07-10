@@ -104,11 +104,13 @@ export function suggestionBlocks(s: SopSuggestion, names?: Map<string, string>):
     targetSopId: s.targetSopId ?? "",
     name: autoName,
   });
-  const memberList = s.memberIds.map((id) => names?.get(id) ?? id).join(", ");
-  const headline =
+  const memberList = (s.memberNames ?? s.memberIds.map((id) => names?.get(id) ?? id)).join(", ");
+  const title =
     s.kind === "add-to-sop"
-      ? `🧩 *${s.memberIds.length} workflow${s.memberIds.length === 1 ? "" : "s"}* that ${s.reason} belong with *${s.targetSopName}*`
-      : `🧩 *${s.memberIds.length} workflows* ${s.reason} — looks like one process`;
+      ? `🧩 *Add to ${s.targetSopName}?*`
+      : "🧩 *Suggested process — worth an SOP?*";
+  const body = s.rationale ?? s.reason;
+  const footer = s.factLine ?? `Workflows: ${memberList}`;
 
   const accept =
     s.kind === "add-to-sop"
@@ -116,8 +118,8 @@ export function suggestionBlocks(s: SopSuggestion, names?: Map<string, string>):
       : button("Create SOP", "create_sop_from_suggestion", value, "primary");
 
   return [
-    { type: "section", text: { type: "mrkdwn", text: headline } },
-    { type: "context", elements: [{ type: "mrkdwn", text: `Workflows: ${memberList}` }] },
+    { type: "section", text: { type: "mrkdwn", text: `${title}\n${body}` } },
+    { type: "context", elements: [{ type: "mrkdwn", text: footer }] },
     {
       type: "actions",
       elements: [accept, button("Dismiss", "dismiss_suggestion", value, "danger")],

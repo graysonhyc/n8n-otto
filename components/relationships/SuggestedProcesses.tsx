@@ -72,10 +72,11 @@ export function SuggestedProcesses({ suggestions }: { suggestions: SopSuggestion
       <ul className="divide-y divide-line">
         {suggestions.map((s) => {
           const busy = busyId === s.id;
+          const names = s.memberNames ?? [];
           return (
-            <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
+            <li key={s.id} className="flex items-start gap-3 px-4 py-3">
               <span
-                className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] whitespace-nowrap ${
+                className={`mt-0.5 inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] whitespace-nowrap ${
                   s.confidence === "strong"
                     ? "border-accent-dim bg-accent-dim/40 text-accent"
                     : "border-line text-muted bg-panel-3"
@@ -84,19 +85,18 @@ export function SuggestedProcesses({ suggestions }: { suggestions: SopSuggestion
                 {s.confidence === "strong" ? "Likely" : "Possible"}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] text-ink">
-                  {s.kind === "add-to-sop" ? (
-                    <>
-                      <b className="nums">{s.memberIds.length}</b> workflow{s.memberIds.length === 1 ? "" : "s"} that{" "}
-                      {s.reason} belong with{" "}
-                      <span className="text-accent">{s.targetSopName}</span>
-                    </>
-                  ) : (
-                    <>
-                      <b className="nums">{s.memberIds.length}</b> workflows {s.reason}
-                    </>
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  {names.map((n, i) => (
+                    <span key={i} className="rounded border border-line-2 bg-panel-3 px-1.5 py-0.5 text-[11px] text-ink">
+                      {n}
+                    </span>
+                  ))}
+                  {s.kind === "add-to-sop" && (
+                    <span className="text-[11px] text-faint">→ {s.targetSopName}</span>
                   )}
-                </p>
+                </div>
+                <p className="text-[13px] leading-snug text-muted">{s.rationale ?? s.reason}</p>
+                {s.factLine && <p className="mt-1 text-[11px] text-faint">{s.factLine}</p>}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {s.kind === "add-to-sop" ? (

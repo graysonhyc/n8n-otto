@@ -1,8 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { classifySuggestions, buildClusters, type SuggestionInput } from "@/lib/derive/suggestions";
+import {
+  classifySuggestions,
+  buildClusters,
+  type SuggestionInput,
+  type Cluster,
+} from "@/lib/derive/suggestions";
 import type { N8nWorkflow, N8nNode } from "@/lib/n8n/types";
 
 // ---- classifySuggestions ----------------------------------------------------
+
+const NO_BASIS = { viaCalls: true, sharedResource: null };
+// Test helper: a cluster with a default basis so callers only specify what matters.
+const cl = (over: Partial<Cluster>): Cluster => ({
+  memberIds: [],
+  confidence: "strong",
+  reason: "x",
+  basis: NO_BASIS,
+  ...over,
+});
 
 const base = (over: Partial<SuggestionInput> = {}): SuggestionInput => ({
   clusters: [],
@@ -14,7 +29,7 @@ const base = (over: Partial<SuggestionInput> = {}): SuggestionInput => ({
 describe("classifySuggestions", () => {
   it("suggests a new SOP when no member is assigned", () => {
     const out = classifySuggestions(
-      base({ clusters: [{ memberIds: ["b", "a", "c"], confidence: "strong", reason: "call each other" }] }),
+      base({ clusters: [cl({ memberIds: ["b", "a", "c"], confidence: "strong", reason: "call each other" })] }),
     );
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe("new-sop");
@@ -25,7 +40,7 @@ describe("classifySuggestions", () => {
   it("suggests add-to-sop when some members belong to exactly one SOP", () => {
     const out = classifySuggestions(
       base({
-        clusters: [{ memberIds: ["a", "b", "c"], confidence: "strong", reason: "x" }],
+        clusters: [cl({ memberIds: ["a", "b", "c"], confidence: "strong", reason: "x" })],
         sopByWorkflow: new Map([["a", { id: "s1", name: "Refunds" }]]),
       }),
     );
@@ -38,7 +53,7 @@ describe("classifySuggestions", () => {
   it("skips clusters spanning two different SOPs", () => {
     const out = classifySuggestions(
       base({
-        clusters: [{ memberIds: ["a", "b"], confidence: "strong", reason: "x" }],
+        clusters: [cl({ memberIds: ["a", "b"], confidence: "strong", reason: "x" })],
         sopByWorkflow: new Map([
           ["a", { id: "s1", name: "A" }],
           ["b", { id: "s2", name: "B" }],
@@ -51,7 +66,7 @@ describe("classifySuggestions", () => {
   it("skips add-to-sop when no members are actually missing", () => {
     const out = classifySuggestions(
       base({
-        clusters: [{ memberIds: ["a", "b"], confidence: "strong", reason: "x" }],
+        clusters: [cl({ memberIds: ["a", "b"], confidence: "strong", reason: "x" })],
         sopByWorkflow: new Map([
           ["a", { id: "s1", name: "A" }],
           ["b", { id: "s1", name: "A" }],
@@ -63,11 +78,11 @@ describe("classifySuggestions", () => {
 
   it("filters out dismissed suggestions by stable id", () => {
     const first = classifySuggestions(
-      base({ clusters: [{ memberIds: ["a", "b"], confidence: "strong", reason: "x" }] }),
+      base({ clusters: [cl({ memberIds: ["a", "b"], confidence: "strong", reason: "x" })] }),
     );
     const out = classifySuggestions(
       base({
-        clusters: [{ memberIds: ["a", "b"], confidence: "strong", reason: "x" }],
+        clusters: [cl({ memberIds: ["a", "b"], confidence: "strong", reason: "x" })],
         dismissed: new Set([first[0].id]),
       }),
     );
@@ -75,8 +90,8 @@ describe("classifySuggestions", () => {
   });
 
   it("gives the same id regardless of member order", () => {
-    const a = classifySuggestions(base({ clusters: [{ memberIds: ["a", "b"], confidence: "strong", reason: "x" }] }));
-    const b = classifySuggestions(base({ clusters: [{ memberIds: ["b", "a"], confidence: "strong", reason: "x" }] }));
+    const a = classifySuggestions(base({ clusters: [cl({ memberIds: ["a", "b"], confidence: "strong", reason: "x" })] }));
+    const b = classifySuggestions(base({ clusters: [cl({ memberIds: ["b", "a"], confidence: "strong", reason: "x" })] }));
     expect(a[0].id).toBe(b[0].id);
   });
 
@@ -84,8 +99,8 @@ describe("classifySuggestions", () => {
     const out = classifySuggestions(
       base({
         clusters: [
-          { memberIds: ["e", "f"], confidence: "possible", reason: "share" },
-          { memberIds: ["a", "b"], confidence: "strong", reason: "call" },
+          cl({ memberIds: ["e", "f"], confidence: "possible", reason: "share" }),
+          cl({ memberIds: ["a", "b"], confidence: "strong", reason: "call" }),
         ],
       }),
     );
@@ -132,7 +147,8 @@ describe("buildClusters", () => {
     expect(clusters).toHaveLength(1);
     expect(clusters[0].confidence).toBe("possible");
     expect(clusters[0].memberIds).toEqual(["a", "b"]);
-    expect(clusters[0].reason).toMatch(/Postgres:orders/);
+    expect(clusters[0].reason).toMatch(/Postgres: orders/);
+    expect(clusters[0].basis).toEqual({ viaCalls: false, sharedResource: { system: "Postgres", name: "orders" } });
   });
 
   it("merges a call edge and a shared source into a single strong cluster", () => {

@@ -2,6 +2,7 @@ import "server-only";
 import { getAllOwners, getSlackInstall, getSuggestionStates, listSops, setSuggestionState } from "@/lib/backoffice/store";
 import { loadInstance } from "@/lib/data/source";
 import { buildClusters, classifySuggestions } from "@/lib/derive/suggestions";
+import { enrichSuggestions } from "@/lib/data/suggestions";
 import { postBlocks } from "@/lib/slack/post";
 import { suggestionBlocks } from "@/lib/slack/blocks";
 import type { Owner } from "@/lib/backoffice/types";
@@ -35,7 +36,7 @@ export async function runSuggestionSweep(): Promise<SuggestionSweepResult> {
   const install = await getSlackInstall();
   if (!install) return { ok: false, status: 400, error: "Slack not connected" };
 
-  const [{ workflows }, sops, owners, states] = await Promise.all([
+  const [{ workflows, executions }, sops, owners, states] = await Promise.all([
     loadInstance(),
     listSops(),
     getAllOwners(),
@@ -48,7 +49,8 @@ export async function runSuggestionSweep(): Promise<SuggestionSweepResult> {
 
   // Any suggestion with a state row (dismissed OR notified) is already handled.
   const acted = new Set(states.keys());
-  const fresh = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed: acted });
+  const raw = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed: acted });
+  const fresh = await enrichSuggestions(raw, { workflows, executions, owners });
 
   let posted = 0;
   for (const s of fresh) {

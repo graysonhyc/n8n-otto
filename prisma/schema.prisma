@@ -103,3 +103,11 @@ model SopSuggestionState {
   status    String // dismissed | notified
   updatedAt DateTime @updatedAt
 }
+
+/// Cached LLM rationale for a suggestion, keyed by the same stable suggestion id.
+/// Generated once (off the render path), reused by the page and the Slack sweep.
+model SopSuggestionReason {
+  id        String   @id
+  rationale String
+  createdAt DateTime @default(now())
+}
