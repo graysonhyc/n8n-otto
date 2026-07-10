@@ -277,6 +277,89 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "ownership_coverage",
+    description:
+      "Ownership health scorecard for the estate: what % of active workflows have a confirmed owner, the unowned-critical list, bus-factor (teams carrying many critical workflows), and stale ownership (owned but untouched for 90+ days). Use for 'how's our ownership coverage?', 'what's unowned?', 'where's the bus-factor risk?'.",
+    parameters: { type: "object", properties: {} },
+    run: (_args, ctx) => {
+      const active = ctx.items.filter((i) => i.active);
+      const owned = active.filter((i) => i.owner);
+      const unownedCritical = active
+        .filter((i) => !i.owner && i.criticality === "High")
+        .map((i) => ({ id: i.id, name: i.name, systems: i.systems }));
+
+      const criticalByTeam = new Map<string, number>();
+      for (const i of active) {
+        if (i.owner && i.criticality === "High") {
+          criticalByTeam.set(i.owner.team, (criticalByTeam.get(i.owner.team) ?? 0) + 1);
+        }
+      }
+      const busFactor = [...criticalByTeam.entries()]
+        .filter(([, n]) => n >= 4)
+        .map(([team, count]) => ({ team, criticalWorkflows: count }));
+
+      const cutoff = ctx.now - 90 * 86_400_000;
+      const staleOwnership = active
+        .filter((i) => i.owner && i.lastChange && Date.parse(i.lastChange) < cutoff)
+        .map((i) => ({ id: i.id, name: i.name, owner: i.owner!.team, lastChange: i.lastChange }));
+
+      return {
+        coveragePct: active.length ? Math.round((owned.length / active.length) * 100) : 100,
+        activeWorkflows: active.length,
+        owned: owned.length,
+        unownedCritical,
+        busFactor,
+        staleOwnership,
+      };
+    },
+  },
+  {
+    name: "credential_impact",
+    description:
+      "Shared-credential change-risk: which workflows share a credential, so you know what a rotation or key change would break. Query by credential name, or by a workflow id to see every credential it shares and the co-dependent workflows. Use for 'what breaks if we rotate the Stripe key?', 'what shares credentials with X?'.",
+    parameters: {
+      type: "object",
+      properties: {
+        credential: { type: "string", description: "credential name (substring ok)" },
+        workflowId: { type: "string" },
+      },
+    },
+    run: (args, ctx) => {
+      const nameOf = (id: string) => ctx.items.find((i) => i.id === id)?.name ?? id;
+      // Build credential name -> set of workflow ids from shared-credential edges.
+      const byCred = new Map<string, Set<string>>();
+      for (const e of ctx.graph.edges) {
+        if (e.kind !== "shares-credential" || !e.label) continue;
+        const set = byCred.get(e.label) ?? new Set<string>();
+        set.add(e.source);
+        set.add(e.target);
+        byCred.set(e.label, set);
+      }
+
+      if (args.workflowId) {
+        const wid = String(args.workflowId);
+        const creds = [...byCred.entries()]
+          .filter(([, set]) => set.has(wid))
+          .map(([credential, set]) => ({
+            credential,
+            sharedWith: [...set].filter((id) => id !== wid).map((id) => ({ id, name: nameOf(id) })),
+          }));
+        return { workflow: nameOf(wid), sharedCredentials: creds };
+      }
+
+      const q = String(args.credential ?? "").toLowerCase();
+      const results = [...byCred.entries()]
+        .filter(([credential]) => !q || credential.toLowerCase().includes(q))
+        .map(([credential, set]) => ({
+          credential,
+          workflowCount: set.size,
+          workflows: [...set].map((id) => ({ id, name: nameOf(id) })),
+          rotationRisk: set.size >= 3 ? "high" : set.size === 2 ? "medium" : "low",
+        }));
+      return { count: results.length, results };
+    },
+  },
+  {
     name: "who_owns",
     description: "The owning team + Slack channel for a workflow, and whether ownership is confirmed.",
     parameters: {

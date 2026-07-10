@@ -69,6 +69,20 @@ describe("agent tools", () => {
     expect(Array.isArray(res.results)).toBe(true);
   });
 
+  it("ownership_coverage returns a coverage percentage", () => {
+    const res = dispatch("ownership_coverage", {}, ctx) as { coveragePct: number; unownedCritical: unknown[] };
+    expect(typeof res.coveragePct).toBe("number");
+    expect(Array.isArray(res.unownedCritical)).toBe(true);
+  });
+
+  it("credential_impact lists shared-credential fan-out with a rotation risk", () => {
+    const res = dispatch("credential_impact", {}, ctx) as {
+      results: Array<{ credential: string; rotationRisk: string; workflowCount: number }>;
+    };
+    expect(Array.isArray(res.results)).toBe(true);
+    for (const r of res.results) expect(["high", "medium", "low"]).toContain(r.rotationRisk);
+  });
+
   it("throws on an unknown tool", () => {
     expect(() => dispatch("frobnicate", {}, ctx)).toThrow(/unknown tool/i);
   });
