@@ -47,3 +47,8 @@ build.log
 *.db-journal
 prisma/dev.db*
 .gstack/
+
+# Local skill-install tooling (superdesign etc.) — not app code
+.agents/
+.claude/
+skills-lock.json
