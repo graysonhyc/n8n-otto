@@ -156,29 +156,37 @@ export default async function OverviewPage() {
       </div>
 
       {/* queue + charts */}
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <Panel
-          title="Needs attention"
-          aside={
-            <Link href="/brief" className="flex items-center gap-1 text-[12px] font-medium text-accent-strong hover:underline">
-              View all brief <Icon name="chevron" size={12} />
-            </Link>
-          }
-          className="overflow-hidden"
-        >
-          {queue.length === 0 ? (
-            <div className="grid place-items-center gap-2 py-10 text-center">
-              <Icon name="check" size={26} className="text-ok" strokeWidth={2} />
-              <p className="text-[13px] text-muted">All clear — nothing needs attention.</p>
-            </div>
-          ) : (
-            <div className="-mx-4 -my-4">
-              {queue.map((item) => (
-                <QueueRow key={item.key} item={item} />
-              ))}
-            </div>
+      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
+        <div className="flex flex-col gap-4">
+          <Panel
+            title="Needs attention"
+            aside={
+              <Link href="/brief" className="flex items-center gap-1 text-[12px] font-medium text-accent-strong hover:underline">
+                View all brief <Icon name="chevron" size={12} />
+              </Link>
+            }
+            className="overflow-hidden"
+          >
+            {queue.length === 0 ? (
+              <div className="grid place-items-center gap-2 py-10 text-center">
+                <Icon name="check" size={26} className="text-ok" strokeWidth={2} />
+                <p className="text-[13px] text-muted">All clear — nothing needs attention.</p>
+              </div>
+            ) : (
+              <div className="-mx-4 -my-4">
+                {queue.map((item) => (
+                  <QueueRow key={item.key} item={item} />
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {o.byTeam.length > 0 && (
+            <Panel title="Workflows by team">
+              <HBars rows={o.byTeam} />
+            </Panel>
           )}
-        </Panel>
+        </div>
 
         <div className="flex flex-col gap-4">
           <Panel title="Workflow health">
@@ -189,12 +197,6 @@ export default async function OverviewPage() {
               </div>
             </div>
           </Panel>
-
-          {o.byTeam.length > 0 && (
-            <Panel title="Workflows by team">
-              <HBars rows={o.byTeam} />
-            </Panel>
-          )}
 
           {o.bySystem.length > 0 && (
             <Panel title="Top integrations">

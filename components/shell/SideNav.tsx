@@ -15,12 +15,14 @@ type Item = {
   hint?: string;
 };
 
-const BACKOFFICE: Item[] = [
-  { href: "/overview", label: "Overview", icon: "home" },
-  { href: "/brief", label: "Brief", icon: "shield", badge: 4 },
-  { href: "/registry", label: "Registry", icon: "table" },
-  { href: "/map", label: "Relationships", icon: "map" },
-];
+function backofficeItems(briefCount?: number): Item[] {
+  return [
+    { href: "/overview", label: "Overview", icon: "home" },
+    { href: "/brief", label: "Brief", icon: "shield", badge: briefCount || undefined },
+    { href: "/registry", label: "Registry", icon: "table" },
+    { href: "/map", label: "Relationships", icon: "map" },
+  ];
+}
 
 // Deep-links into the connected n8n instance. Built from N8N_BASE_URL; when it's
 // not configured they render disabled rather than as dead "#" links.
@@ -97,10 +99,11 @@ function Label({ children }: { children: string }) {
   );
 }
 
-export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
+export function SideNav({ n8nBaseUrl, briefCount }: { n8nBaseUrl?: string; briefCount?: number }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const n8n = n8nItems(n8nBaseUrl);
+  const backoffice = backofficeItems(briefCount);
 
   return (
     <aside className="flex flex-col gap-0.5 border-r border-line bg-panel px-3 py-3.5">
@@ -113,7 +116,7 @@ export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
         </span>
       </Link>
 
-      {BACKOFFICE.map((item) => (
+      {backoffice.map((item) => (
         <Row key={item.href} item={item} active={isActive(item.href)} />
       ))}
 
