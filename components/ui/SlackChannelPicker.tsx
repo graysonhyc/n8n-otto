@@ -105,7 +105,7 @@ export function SlackChannelPicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-lg border border-line-2 bg-panel-2 shadow-lg shadow-black/40">
+        <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-lg border border-line-2 bg-panel shadow-pop">
           {state.channels.length > 6 && (
             <div className="flex items-center gap-1.5 border-b border-line px-2 py-1.5">
               <Icon name="search" size={12} className="shrink-0 text-faint" />

@@ -173,8 +173,8 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
               onClick={() => toggle(f.key)}
               className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${
                 on
-                  ? "border-accent-line bg-accent-dim text-white"
-                  : "border-line-2 bg-panel-2 text-muted hover:border-[#444754] hover:text-ink"
+                  ? "border-accent-line bg-accent-dim text-accent-strong"
+                  : "border-line-2 bg-panel-2 text-muted hover:border-line-2 hover:bg-panel-3 hover:text-ink"
               }`}
             >
               {f.label}

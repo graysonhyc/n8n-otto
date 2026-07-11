@@ -12,7 +12,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-line bg-panel-2 p-4">
+    <section className="rounded-xl border border-line bg-panel p-4 shadow-card">
       <h2 className="mb-3 flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.07em] text-muted">
         {icon && <span className="text-accent">{icon}</span>}
         {title}

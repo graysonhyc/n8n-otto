@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 export type Tone = "danger" | "warn" | "ok" | "ai" | "info" | "neutral";
 
 const TONES: Record<Tone, string> = {
-  danger: "text-[#ff8078] bg-[#2a1512] border-[#4a1f1a]",
-  warn: "text-[#f6bb54] bg-[#271e0f] border-[#4a3818]",
-  ok: "text-[#5ad6a0] bg-[#0f231b] border-[#1c4535]",
-  ai: "text-[#b8a2f5] bg-[#1b1630] border-[#332a55]",
-  info: "text-[#89b0f5] bg-[#131c2c] border-[#243a5c]",
-  neutral: "text-[#a6a6b2] bg-[#1a1a22] border-[#2d2d38]",
+  danger: "text-danger-fg bg-danger-bg border-danger-bd",
+  warn: "text-warn-fg bg-warn-bg border-warn-bd",
+  ok: "text-ok-fg bg-ok-bg border-ok-bd",
+  ai: "text-ai-fg bg-ai-bg border-ai-bd",
+  info: "text-info-fg bg-info-bg border-info-bd",
+  neutral: "text-neutral-fg bg-neutral-bg border-neutral-bd",
 };
 
 export function Pill({

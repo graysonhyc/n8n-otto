@@ -51,14 +51,14 @@ export function SopCreateDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-xl border border-line-2 bg-panel-2 p-5 shadow-xl shadow-black/50"
+        className="w-full max-w-md rounded-xl border border-line-2 bg-panel p-5 shadow-pop"
       >
         <h2 className="text-[14px] font-semibold text-ink">Create SOP</h2>
         <p className="mt-1 text-[12px] text-muted">

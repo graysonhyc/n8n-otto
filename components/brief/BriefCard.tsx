@@ -7,11 +7,6 @@ import { Pill, type Tone } from "@/components/ui/Pill";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 
-const STRIPE: Record<Severity, string> = {
-  high: "bg-danger",
-  medium: "bg-warn",
-  low: "bg-[#5a5d68]",
-};
 const SEV_TONE: Record<Severity, Tone> = { high: "danger", medium: "warn", low: "neutral" };
 const SEV_LABEL: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
 
@@ -51,11 +46,10 @@ export function BriefCard({ item }: { item: BriefItem }) {
 
   return (
     <div
-      className={`grid grid-cols-[3px_1fr] overflow-hidden rounded-xl border border-line bg-panel-2 transition-[opacity,transform,margin,max-height] duration-200 hover:border-line-2 hover:shadow-[0_6px_22px_rgba(0,0,0,0.28)] ${
+      className={`overflow-hidden rounded-xl border border-line bg-panel shadow-card transition-[opacity,transform,margin,max-height,box-shadow,border-color] duration-200 hover:border-line-2 hover:shadow-card-hover ${
         dismissed ? "pointer-events-none -mt-[1px] max-h-0 translate-x-6 opacity-0" : "max-h-[520px]"
       }`}
     >
-      <div className={STRIPE[item.severity]} />
       <div className="p-4">
         <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
           <Pill tone={SEV_TONE[item.severity]}>{SEV_LABEL[item.severity]}</Pill>
@@ -97,8 +91,8 @@ export function BriefCard({ item }: { item: BriefItem }) {
                   onClick={() => toast(a, { detail: item.title, variant: primary ? "accent" : "ok" })}
                   className={`inline-flex h-[29px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
                     primary
-                      ? "border-accent bg-accent text-accent-ink hover:brightness-110"
-                      : "border-line-2 bg-panel-3 text-ink hover:bg-elev"
+                      ? "border-accent-line bg-accent-dim text-accent-strong hover:border-accent"
+                      : "border-line-2 bg-panel text-ink hover:bg-panel-2"
                   }`}
                 >
                   <Icon name={icon} size={13} />

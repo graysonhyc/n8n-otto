@@ -4,10 +4,13 @@ import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { OPEN_EVENT } from "./CommandPalette";
+import { ThemeToggle } from "./ThemeToggle";
 
 function crumb(pathname: string): { root: string; leaf: string } {
+  if (pathname.startsWith("/overview")) return { root: "Otto", leaf: "Overview" };
   if (pathname.startsWith("/registry")) return { root: "Otto", leaf: "Registry" };
   if (pathname.startsWith("/workflow")) return { root: "Registry", leaf: "Workflow" };
+  if (pathname.startsWith("/map")) return { root: "Otto", leaf: "Relationships" };
   return { root: "Otto", leaf: "Brief" };
 }
 
@@ -35,7 +38,7 @@ export function TopBar() {
 
       <button
         onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
-        className="ml-1.5 flex h-[34px] w-full max-w-[440px] flex-1 items-center gap-2.5 rounded-lg border border-line-2 bg-panel-2 px-3 text-[13px] text-faint transition-colors hover:border-[#40434e] hover:bg-panel-3"
+        className="ml-1.5 flex h-[34px] w-full max-w-[440px] flex-1 items-center gap-2.5 rounded-lg border border-line-2 bg-panel px-3 text-[13px] text-faint transition-colors hover:border-line-2 hover:bg-panel-2"
       >
         <Icon name="search" size={15} />
         Search workflows, owners, changes…
@@ -50,6 +53,7 @@ export function TopBar() {
         <span className="animate-pulse-dot h-[7px] w-[7px] rounded-full bg-ok" />
         Live scan
       </div>
+      <ThemeToggle />
       <button
         onClick={rescan}
         title="Rescan now"

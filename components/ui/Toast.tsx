@@ -82,7 +82,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="animate-toast-in pointer-events-auto flex min-w-[280px] items-center gap-3 rounded-xl border border-line-2 bg-elev px-3.5 py-3 shadow-[0_12px_34px_rgba(0,0,0,0.42)]"
+            className="animate-toast-in pointer-events-auto flex min-w-[280px] items-center gap-3 rounded-xl border border-line-2 bg-elev px-3.5 py-3 shadow-pop"
             role="status"
           >
             <span
