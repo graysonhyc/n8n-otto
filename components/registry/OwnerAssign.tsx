@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RegistryItem } from "@/lib/derive/registry";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +11,11 @@ import { SlackChannelPicker, type SlackChannel } from "@/components/ui/SlackChan
 // that reads the live Slack channels to pick one. The chosen channel *is* the
 // ownership — its name is persisted as the owner "team" so downstream routing
 // (brief, Slack, Linear) keeps working unchanged.
+//
+// Mutations are OPTIMISTIC: `router.refresh()` re-runs the registry loader, which
+// recomputes owner suggestions via an LLM (~2s), so we flip the cell locally the
+// instant a channel is chosen/accepted/dismissed and let the refresh reconcile.
+// Without this the row looked frozen for ~2s and reads as "the click did nothing".
 export function OwnerAssign({ item }: { item: RegistryItem }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -20,21 +25,31 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
       : null,
   );
   const [saving, setSaving] = useState(false);
+  const [pending, startTransition] = useTransition();
+  // Optimistic overrides applied before the server refresh lands.
+  const [optimisticOwner, setOptimisticOwner] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   async function post(body: Record<string, unknown>) {
     setSaving(true);
-    await fetch("/api/owners", {
+    const res = await fetch("/api/owners", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     setSaving(false);
     setOpen(false);
-    router.refresh();
+    if (!res.ok) {
+      // Assignment failed — roll back the optimistic state so the row is honest.
+      setOptimisticOwner(null);
+      return;
+    }
+    startTransition(() => router.refresh());
   }
 
   async function save() {
     if (!channel) return;
+    setOptimisticOwner(channel.name); // instant feedback
     // The channel name doubles as the routing key ("team") downstream.
     await post({
       workflowId: item.id,
@@ -49,6 +64,7 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
   async function acceptSuggestion() {
     const s = item.suggestedChannel;
     if (!s) return;
+    setOptimisticOwner(s.channelName); // instant feedback
     await post({
       workflowId: item.id,
       team: s.channelName,
@@ -60,6 +76,7 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
   }
 
   async function dismissSuggestion() {
+    setDismissed(true); // instant feedback: hide the suggestion now
     setSaving(true);
     await fetch("/api/owner-suggestions/dismiss", {
       method: "POST",
@@ -67,27 +84,36 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
       body: JSON.stringify({ workflowId: item.id }),
     });
     setSaving(false);
-    router.refresh();
+    startTransition(() => router.refresh());
   }
 
+  // Resolved owner label: server truth, or the optimistic pick before refresh.
+  const ownerLabel = item.owner
+    ? (item.owner.slackChannelName ?? item.owner.team)
+    : optimisticOwner;
+
   if (!open) {
-    if (item.owner) {
-      const label = (item.owner.slackChannelName ?? item.owner.team).replace(/^#+/, "");
+    if (ownerLabel) {
+      const label = ownerLabel.replace(/^#+/, "");
       return (
         <button onClick={() => setOpen(true)} title="Edit channel" className="group text-left">
           <span className="flex items-center gap-1.5 text-accent">
             #{label}
-            <Icon
-              name="pencil"
-              size={12}
-              className="shrink-0 text-faint transition-colors group-hover:text-muted"
-            />
+            {pending ? (
+              <span className="text-[10px] text-faint">saving…</span>
+            ) : (
+              <Icon
+                name="pencil"
+                size={12}
+                className="shrink-0 text-faint transition-colors group-hover:text-muted"
+              />
+            )}
           </span>
         </button>
       );
     }
 
-    if (item.suggestedChannel) {
+    if (item.suggestedChannel && !dismissed) {
       const s = item.suggestedChannel;
       return (
         <div className="flex flex-col gap-1">
@@ -135,7 +161,7 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
       );
     }
 
-    if (item.suggestedOwner) {
+    if (item.suggestedOwner && !dismissed) {
       const { team: sTeam, confidence } = item.suggestedOwner;
       return (
         <div className="flex flex-col gap-1">
