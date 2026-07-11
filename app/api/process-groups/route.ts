@@ -5,6 +5,7 @@ import { createSop, deleteSop, updateSop } from "@/lib/backoffice/store";
 const CreateBody = z.object({
   name: z.string().trim().min(1).max(80),
   memberIds: z.array(z.string().min(1)).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
 });
 
 const UpdateBody = z.object({
@@ -18,7 +19,11 @@ const DeleteBody = z.object({ id: z.string().min(1) });
 export async function POST(request: Request) {
   const parsed = CreateBody.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  const sop = await createSop(parsed.data.name, parsed.data.memberIds ?? []);
+  const sop = await createSop(
+    parsed.data.name,
+    parsed.data.memberIds ?? [],
+    parsed.data.description ?? null,
+  );
   return NextResponse.json(sop);
 }
 

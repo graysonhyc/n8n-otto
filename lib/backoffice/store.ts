@@ -243,8 +243,12 @@ export async function getSop(id: string): Promise<SopWithMembers | null> {
   return row ? toSopWithMembers(row) : null;
 }
 
-export async function createSop(name: string, memberIds: string[] = []): Promise<Sop> {
-  const row = await prisma.processGroup.create({ data: { name } });
+export async function createSop(
+  name: string,
+  memberIds: string[] = [],
+  description?: string | null,
+): Promise<Sop> {
+  const row = await prisma.processGroup.create({ data: { name, description: description ?? null } });
   for (let i = 0; i < memberIds.length; i++) await assignMember(memberIds[i], row.id, i);
   return { id: row.id, name: row.name, description: row.description, updatedAt: row.updatedAt.toISOString() };
 }

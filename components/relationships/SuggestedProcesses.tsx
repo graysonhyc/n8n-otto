@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { SopCreateDialog } from "./SopCreateDialog";
 import type { SopSuggestion } from "@/lib/derive/suggestions";
 
 /**
@@ -13,22 +14,47 @@ import type { SopSuggestion } from "@/lib/derive/suggestions";
 export function SuggestedProcesses({ suggestions }: { suggestions: SopSuggestion[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The suggestion whose create form is open, plus the agent-recommended name.
+  const [drafting, setDrafting] = useState<SopSuggestion | null>(null);
+  const [suggestedName, setSuggestedName] = useState("");
+  const [nameLoading, setNameLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   if (suggestions.length === 0) return null;
 
-  async function createSop(s: SopSuggestion) {
-    setBusyId(s.id);
+  // Open the create form and fetch the agent's recommended name in the
+  // background (description is prefilled from the rationale already on hand).
+  function openCreate(s: SopSuggestion) {
+    setDrafting(s);
+    setSuggestedName("");
+    setNameLoading(true);
+    fetch("/api/process-groups/suggest-name", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberNames: s.memberNames ?? [], rationale: s.rationale }),
+    })
+      .then((r) => r.json())
+      .then((d: { name?: string }) => setSuggestedName(d.name ?? ""))
+      .catch(() => setSuggestedName(""))
+      .finally(() => setNameLoading(false));
+  }
+
+  async function createSop(name: string, description: string) {
+    const s = drafting;
+    if (!s) return;
+    setCreating(true);
     try {
       const res = await fetch("/api/process-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: `Process (${s.memberIds.length} workflows)`, memberIds: s.memberIds }),
+        body: JSON.stringify({ name, description, memberIds: s.memberIds }),
       });
       const sop = (await res.json()) as { id?: string };
+      setDrafting(null);
       if (sop.id) router.push(`/map/sop/${sop.id}`);
       else router.refresh();
     } finally {
-      setBusyId(null);
+      setCreating(false);
     }
   }
 
@@ -64,6 +90,19 @@ export function SuggestedProcesses({ suggestions }: { suggestions: SopSuggestion
   }
 
   return (
+    <>
+    {drafting && (
+      <SopCreateDialog
+        key={drafting.id}
+        initialName={suggestedName}
+        initialDescription={drafting.rationale ?? drafting.reason ?? ""}
+        nameLoading={nameLoading}
+        busy={creating}
+        memberNames={drafting.memberNames ?? []}
+        onSubmit={({ name, description }) => createSop(name, description)}
+        onClose={() => setDrafting(null)}
+      />
+    )}
     <div className="mb-4 rounded-xl border border-line bg-panel">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <span className="text-[12px] font-semibold tracking-[0.08em] text-faint uppercase">Suggested processes</span>
@@ -104,8 +143,8 @@ export function SuggestedProcesses({ suggestions }: { suggestions: SopSuggestion
                     {busy ? "Adding…" : `Add to ${s.targetSopName}`}
                   </Button>
                 ) : (
-                  <Button variant="primary" onClick={() => createSop(s)} disabled={busy}>
-                    {busy ? "Creating…" : "Create SOP"}
+                  <Button variant="primary" onClick={() => openCreate(s)} disabled={busy}>
+                    Create SOP
                   </Button>
                 )}
                 <Button variant="ghost" onClick={() => dismiss(s)} disabled={busy} aria-label="Dismiss suggestion">
@@ -117,5 +156,6 @@ export function SuggestedProcesses({ suggestions }: { suggestions: SopSuggestion
         })}
       </ul>
     </div>
+    </>
   );
 }
