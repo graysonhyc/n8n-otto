@@ -2,6 +2,7 @@ import type { N8nExecution, N8nWorkflow, WorkflowType, TriggerKind } from "@/lib
 import type { Owner } from "@/lib/backoffice/types";
 import { classify } from "./classify";
 import { suggestOwner, type OwnerSuggestion } from "./owner";
+import type { OwnerChannelSuggestion } from "@/lib/ai/suggestOwnerChannels";
 import { unreachableNodes } from "./structure";
 
 export interface Health {
@@ -32,6 +33,9 @@ export interface RegistryItem {
   owner: Owner | null;
   // Suggested owning team (classifier), present only while unassigned + confident.
   suggestedOwner: OwnerSuggestion | null;
+  // LLM-judged best-fit live Slack channel, attached in the data layer for
+  // unowned + non-dismissed workflows. Null otherwise. See lib/data/load.ts.
+  suggestedChannel: OwnerChannelSuggestion | null;
   criticality: "High" | "Medium" | "Low";
   health: Health;
   risk: RiskAssessment;
@@ -150,6 +154,7 @@ export function composeRegistryItem(
     owner,
     // Only suggest when nobody's assigned — a confirmed owner wins.
     suggestedOwner: owner ? null : suggestOwner(workflow),
+    suggestedChannel: null,
     criticality,
     health,
     risk: assessRisk({

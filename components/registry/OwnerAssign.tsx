@@ -44,6 +44,32 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
     });
   }
 
+  // ✓ on an LLM suggestion: assign that channel (source "inferred" — a human
+  // still clicked, so it's confirmed downstream). ✗: dismiss the suggestion.
+  async function acceptSuggestion() {
+    const s = item.suggestedChannel;
+    if (!s) return;
+    await post({
+      workflowId: item.id,
+      team: s.channelName,
+      slackChannelId: s.channelId,
+      slackChannelName: s.channelName,
+      source: "inferred",
+      reasoning: s.reasoning,
+    });
+  }
+
+  async function dismissSuggestion() {
+    setSaving(true);
+    await fetch("/api/owner-suggestions/dismiss", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ workflowId: item.id }),
+    });
+    setSaving(false);
+    router.refresh();
+  }
+
   if (!open) {
     if (item.owner) {
       const label = (item.owner.slackChannelName ?? item.owner.team).replace(/^#+/, "");
@@ -58,6 +84,54 @@ export function OwnerAssign({ item }: { item: RegistryItem }) {
             />
           </span>
         </button>
+      );
+    }
+
+    if (item.suggestedChannel) {
+      const s = item.suggestedChannel;
+      return (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-faint">Suggested</span>
+            <span className="text-accent" title={s.reasoning}>
+              #{s.channelName.replace(/^#+/, "")}
+            </span>
+            <span
+              className={`rounded px-1 py-px text-[9.5px] uppercase tracking-wide ${
+                s.confidence === "high"
+                  ? "bg-accent-dim text-accent"
+                  : s.confidence === "low"
+                    ? "bg-panel-3 text-warn"
+                    : "bg-panel-3 text-muted"
+              }`}
+            >
+              {s.confidence}
+            </span>
+            <button
+              onClick={acceptSuggestion}
+              disabled={saving}
+              title={`Assign #${s.channelName}`}
+              className="grid size-5 place-items-center rounded text-accent transition-colors hover:bg-accent-dim disabled:opacity-50"
+            >
+              <Icon name="check" size={13} />
+            </button>
+            <button
+              onClick={dismissSuggestion}
+              disabled={saving}
+              title="Dismiss suggestion"
+              className="grid size-5 place-items-center rounded text-faint transition-colors hover:bg-panel-3 hover:text-muted disabled:opacity-50"
+            >
+              <Icon name="close" size={13} />
+            </button>
+          </div>
+          {!s.isMember && <span className="text-[10px] text-warn">Bot not in channel — invite it to post.</span>}
+          <button
+            onClick={() => setOpen(true)}
+            className="self-start text-[11px] font-semibold text-muted hover:text-accent hover:underline"
+          >
+            Pick another
+          </button>
+        </div>
       );
     }
 

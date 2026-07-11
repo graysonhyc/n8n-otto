@@ -27,7 +27,8 @@ export type IconName =
   | "book"
   | "home"
   | "pulse"
-  | "pencil";
+  | "pencil"
+  | "close";
 
 const PATHS: Record<IconName, ReactElement> = {
   shield: <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z M9 12l2 2 4-4" />,
@@ -55,6 +56,7 @@ const PATHS: Record<IconName, ReactElement> = {
   home: <path d="M3 11l9-8 9 8 M5 10v9h14v-9" />,
   pulse: <path d="M3 12h4l2-5 4 12 2-7h6" />,
   pencil: <path d="M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />,
+  close: <path d="M6 6l12 12 M18 6L6 18" />,
 };
 
 export function Icon({

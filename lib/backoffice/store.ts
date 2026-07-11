@@ -152,6 +152,28 @@ export async function setBriefState(
   });
 }
 
+// ---- Owner-suggestion dismissals --------------------------------------------
+// Reuses the generic BriefItemState key→status table (no dedicated migration).
+// A dismissed owner suggestion is keyed `owner-suggest:<workflowId>`.
+
+const OWNER_SUGGEST_PREFIX = "owner-suggest:";
+
+export async function dismissOwnerSuggestion(workflowId: string): Promise<void> {
+  const key = OWNER_SUGGEST_PREFIX + workflowId;
+  await prisma.briefItemState.upsert({
+    where: { key },
+    create: { key, status: "dismissed" },
+    update: { status: "dismissed" },
+  });
+}
+
+export async function getDismissedOwnerSuggestions(): Promise<Set<string>> {
+  const rows = await prisma.briefItemState.findMany({
+    where: { key: { startsWith: OWNER_SUGGEST_PREFIX } },
+  });
+  return new Set(rows.map((r) => r.key.slice(OWNER_SUGGEST_PREFIX.length)));
+}
+
 // ---- SOP suggestion state ---------------------------------------------------
 
 export async function getSuggestionStates(): Promise<Map<string, SopSuggestionStatus>> {
