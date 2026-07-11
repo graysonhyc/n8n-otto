@@ -12,7 +12,7 @@ export default async function BriefPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Backoffice Brief"
+        title="Otto Brief"
         subtitle={
           items.length ? (
             <>

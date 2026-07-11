@@ -6,9 +6,9 @@ import { useToast } from "@/components/ui/Toast";
 import { OPEN_EVENT } from "./CommandPalette";
 
 function crumb(pathname: string): { root: string; leaf: string } {
-  if (pathname.startsWith("/registry")) return { root: "Backoffice", leaf: "Registry" };
+  if (pathname.startsWith("/registry")) return { root: "Otto", leaf: "Registry" };
   if (pathname.startsWith("/workflow")) return { root: "Registry", leaf: "Workflow" };
-  return { root: "Backoffice", leaf: "Brief" };
+  return { root: "Otto", leaf: "Brief" };
 }
 
 export function TopBar() {

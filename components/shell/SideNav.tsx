@@ -103,12 +103,12 @@ export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
 
   return (
     <aside className="flex flex-col gap-0.5 border-r border-line bg-[color-mix(in_srgb,var(--color-panel)_88%,black)] px-3 py-3.5">
-      <Link href="/brief" className="mb-2 flex items-center gap-2.5 px-2 py-1" aria-label="n8n Backoffice — home">
+      <Link href="/brief" className="mb-2 flex items-center gap-2.5 px-2 py-1" aria-label="n8n Otto — home">
         <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-gradient-to-br from-accent to-[#b8365a] shadow-[0_2px_8px_rgba(234,75,113,0.35)]">
           <Icon name="flow" size={15} className="text-white" strokeWidth={2} />
         </span>
         <span className="text-[13.5px] font-semibold tracking-[-0.01em]">
-          n8n <span className="font-medium text-muted">Backoffice</span>
+          n8n <span className="font-medium text-muted">Otto</span>
         </span>
       </Link>
 

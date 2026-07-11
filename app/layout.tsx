@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "n8n Backoffice",
+  title: "n8n Otto",
   description:
     "The operational control room for enterprise automations and AI agents.",
 };

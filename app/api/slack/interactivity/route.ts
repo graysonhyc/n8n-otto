@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   switch (action.action_id) {
     case "acknowledge":
       if (value.key) await setBriefState(value.key, "acknowledged");
-      text = "✓ Acknowledged. Tracked in Backoffice.";
+      text = "✓ Acknowledged. Tracked in Otto.";
       break;
     case "approve_change":
       if (value.key) await setBriefState(value.key, "acknowledged");
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         await createSop(value.name || `Process (${ids.length} workflows)`, ids);
         if (value.suggestionId) await setSuggestionState(value.suggestionId, "notified");
       }
-      text = "✓ SOP created in Backoffice.";
+      text = "✓ SOP created in Otto.";
       break;
     case "add_to_sop_suggestion":
       if (value.memberIds && value.targetSopId) {
