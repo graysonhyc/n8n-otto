@@ -17,7 +17,7 @@ const FILTERS: { key: FilterKey; label: string; test: (i: BriefItem) => boolean 
 const GROUPS: { sev: Severity; label: string; color: string }[] = [
   { sev: "high", label: "High priority", color: "var(--color-danger)" },
   { sev: "medium", label: "Medium", color: "var(--color-warn)" },
-  { sev: "low", label: "Low", color: "#5a5d68" },
+  { sev: "low", label: "Low", color: "#b6b8bf" },
 ];
 
 function Stat({
@@ -32,9 +32,11 @@ function Stat({
   color: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-4 py-3.5">
-      <span className="absolute top-0 bottom-0 left-0 w-[3px]" style={{ background: color }} />
-      <div className="text-[11px] font-semibold tracking-wide text-faint uppercase">{label}</div>
+    <div className="rounded-xl border border-line bg-panel px-4 py-3.5 shadow-card">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-faint uppercase">
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} aria-hidden />
+        {label}
+      </div>
       <div className="mt-0.5 font-mono text-[27px] font-semibold tracking-[-0.02em] nums">{value}</div>
       <div className="mt-0.5 text-[11.5px] text-muted">{detail}</div>
     </div>
@@ -77,8 +79,8 @@ export function BriefBoard({ items, scanned }: { items: BriefItem[]; scanned: nu
               onClick={() => setFilter(f.key)}
               className={`inline-flex h-[29px] items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors ${
                 on
-                  ? "border-accent-line bg-accent-dim text-white"
-                  : "border-line-2 bg-panel-2 text-muted hover:border-[#444754] hover:text-ink"
+                  ? "border-accent-line bg-accent-dim text-accent-strong"
+                  : "border-line-2 bg-panel-2 text-muted hover:border-line-2 hover:bg-panel-3 hover:text-ink"
               }`}
             >
               {f.label}
@@ -116,7 +118,7 @@ export function BriefBoard({ items, scanned }: { items: BriefItem[]; scanned: nu
           </p>
         </div>
       ) : (
-        <div className="max-w-3xl">
+        <div>
           {GROUPS.map((g) => {
             const rows = visible.filter((i) => i.severity === g.sev);
             if (!rows.length) return null;
@@ -130,7 +132,7 @@ export function BriefBoard({ items, scanned }: { items: BriefItem[]; scanned: nu
                   <span className="font-mono text-[11px] text-faint">{rows.length}</span>
                   <span className="h-px flex-1 bg-line" />
                 </div>
-                <div className={`flex flex-col ${compact ? "gap-2" : "gap-3"}`}>
+                <div className={`grid items-start ${compact ? "gap-2" : "gap-3"} xl:grid-cols-2`}>
                   {rows.map((item) => (
                     <BriefCard key={item.key} item={item} />
                   ))}

@@ -9,7 +9,7 @@ export function Chip({
 }) {
   const cls =
     tone === "ai"
-      ? "text-ai border-[#332a55] bg-[#1b1630]"
+      ? "text-ai-fg border-ai-bd bg-ai-bg"
       : "text-muted border-line bg-panel-3";
   return (
     <span

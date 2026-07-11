@@ -1,59 +1,124 @@
 @import "tailwindcss";
 
 /*
-  n8n Backoffice theme — dark instrument panel + n8n coral accent.
-  Neutrals are biased slightly cool (toward info-blue) so they read chosen,
-  not defaulted. Semantic colours (danger/warn/ok/info) stay separate from the
-  brand accent; AI is violet; change-risk is orange. Data uses the mono face.
+  n8n Otto theme. Two modes off one token set:
+  - Light (default, :root) — n8n-native: warm near-white canvas, pure-white planes,
+    near-black ink. Coral (#ea4b71) is the ONLY brand accent.
+  - Dark (.dark on <html>) — clean instrument panel, no gradient washes.
+  Every colour is a token so the whole app flips on class toggle. Semantic tints
+  (danger/warn/ok/ai/info/neutral) each expose bg/fg/bd triplets used by Pill,
+  Chip, and callouts. Data uses the mono face.
 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-canvas: #0c0d10;
-  --color-panel: #14151b;
-  --color-panel-2: #191b22;
-  --color-panel-3: #21232c;
-  --color-elev: #262933;
-  --color-line: #282a33;
-  --color-line-2: #363a44;
+  --color-canvas: #f7f7f6;
+  --color-panel: #ffffff;
+  --color-panel-2: #f2f2f1;
+  --color-panel-3: #ececeb;
+  --color-elev: #ffffff;
+  --color-line: #e7e7e4;
+  --color-line-2: #d7d7d3;
 
-  --color-ink: #e9eaef;
-  --color-muted: #969aa6;
-  --color-faint: #656975;
+  --color-ink: #1c1d21;
+  --color-muted: #5d5f66;
+  --color-faint: #8a8c93;
 
+  /* brand coral — fills use --color-accent; text-on-canvas uses --color-accent-strong */
   --color-accent: #ea4b71;
   --color-accent-ink: #ffffff;
-  --color-accent-dim: #351a24;
+  --color-accent-strong: #c8285c;
+  --color-accent-dim: #fdeef2;
+  --color-accent-line: #f6cdd9;
+
+  /* semantic solids — dots, stripes, filled badges */
+  --color-danger: #e5484d;
+  --color-danger-strong: #c62a2f;
+  --color-warn: #f59e0b;
+  --color-ok: #12a06b;
+  --color-ai: #7c5cf0;
+  --color-info: #3b6fe0;
+  --color-change: #e0692a;
+
+  /* semantic tint triplets (bg / fg / border) for pills, chips, callouts */
+  --color-danger-bg: #fef3f2;  --color-danger-fg: #b42318;  --color-danger-bd: #fbcbc6;
+  --color-warn-bg: #fef8ec;    --color-warn-fg: #a15c00;    --color-warn-bd: #f6dfac;
+  --color-ok-bg: #ecfdf5;      --color-ok-fg: #067a52;      --color-ok-bd: #b4ecd5;
+  --color-ai-bg: #f4f0ff;      --color-ai-fg: #6740e0;      --color-ai-bd: #ddd2fb;
+  --color-info-bg: #eef3ff;    --color-info-fg: #2f5fd0;    --color-info-bd: #cddbfb;
+  --color-neutral-bg: #f3f3f2; --color-neutral-fg: #5c5f66; --color-neutral-bd: #e2e2df;
+
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --shadow-card: 0 1px 2px rgba(16, 17, 20, 0.04), 0 1px 3px rgba(16, 17, 20, 0.05);
+  --shadow-card-hover: 0 2px 4px rgba(16, 17, 20, 0.05), 0 6px 16px rgba(16, 17, 20, 0.08);
+  --shadow-pop: 0 12px 34px rgba(16, 17, 20, 0.14), 0 2px 8px rgba(16, 17, 20, 0.08);
+}
+
+/* ---- dark mode: override the same tokens ---- */
+.dark {
+  --color-canvas: #0b0b0c;
+  --color-panel: #151517;
+  --color-panel-2: #1b1b1e;
+  --color-panel-3: #232327;
+  --color-elev: #1b1b1e;
+  --color-line: #26262a;
+  --color-line-2: #34343a;
+
+  --color-ink: #ededf0;
+  --color-muted: #9a9aa4;
+  --color-faint: #67676f;
+
+  --color-accent: #f15c83;
+  --color-accent-ink: #ffffff;
+  --color-accent-strong: #ff86a8;
+  --color-accent-dim: #2a141c;
   --color-accent-line: #5a2a38;
 
-  --color-danger: #f0483e;
+  --color-danger: #f0575c;
+  --color-danger-strong: #ff8a8f;
   --color-warn: #f5a623;
   --color-ok: #2bc17e;
   --color-ai: #9a7bf0;
   --color-info: #5b8def;
   --color-change: #ff8a4c;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  --color-danger-bg: #2a1512;  --color-danger-fg: #ff8078;  --color-danger-bd: #4a1f1a;
+  --color-warn-bg: #271e0f;    --color-warn-fg: #f6bb54;    --color-warn-bd: #4a3818;
+  --color-ok-bg: #0f231b;      --color-ok-fg: #5ad6a0;      --color-ok-bd: #1c4535;
+  --color-ai-bg: #1b1630;      --color-ai-fg: #b8a2f5;      --color-ai-bd: #332a55;
+  --color-info-bg: #131c2c;    --color-info-fg: #89b0f5;    --color-info-bd: #243a5c;
+  --color-neutral-bg: #1a1a22; --color-neutral-fg: #a6a6b2; --color-neutral-bd: #2d2d38;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 2px 6px rgba(0, 0, 0, 0.5), 0 8px 22px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 html { height: 100%; }
 
 body {
   min-height: 100%;
-  background:
-    radial-gradient(1100px 560px at 82% -12%, #1a1320 0%, transparent 58%),
-    radial-gradient(820px 460px at -8% 8%, #0f1620 0%, transparent 52%),
-    var(--color-canvas);
-  background-attachment: fixed;
+  background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #2a2c36; border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: #363945; }
+/* smooth the theme flip without animating every interaction */
+html.theme-ready body,
+html.theme-ready body * {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: #d4d4d0; border-radius: 8px; border: 3px solid var(--color-canvas); }
+::-webkit-scrollbar-thumb:hover { background: #bfbfba; }
 ::-webkit-scrollbar-track { background: transparent; }
+.dark ::-webkit-scrollbar-thumb { background: #34343a; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #45454c; }
 
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
@@ -62,9 +127,9 @@ body {
 
 /* ---- motion ---- */
 @keyframes pulseDot {
-  0%   { box-shadow: 0 0 0 0 rgba(43, 193, 126, 0.5); }
-  70%  { box-shadow: 0 0 0 6px rgba(43, 193, 126, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(43, 193, 126, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(18, 160, 107, 0.45); }
+  70%  { box-shadow: 0 0 0 6px rgba(18, 160, 107, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(18, 160, 107, 0); }
 }
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(4px); }

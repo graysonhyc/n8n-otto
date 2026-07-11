@@ -15,18 +15,21 @@ type Item = {
   hint?: string;
 };
 
-const BACKOFFICE: Item[] = [
-  { href: "/brief", label: "Brief", icon: "shield", badge: 4 },
-  { href: "/registry", label: "Registry", icon: "table" },
-  { href: "/map", label: "Relationships", icon: "map" },
-];
+function backofficeItems(briefCount?: number): Item[] {
+  return [
+    { href: "/overview", label: "Overview", icon: "home" },
+    { href: "/brief", label: "Brief", icon: "shield", badge: briefCount || undefined },
+    { href: "/registry", label: "Registry", icon: "table" },
+    { href: "/map", label: "Relationships", icon: "map" },
+  ];
+}
 
 // Deep-links into the connected n8n instance. Built from N8N_BASE_URL; when it's
 // not configured they render disabled rather than as dead "#" links.
 function n8nItems(baseUrl?: string): Item[] {
   const base = baseUrl?.replace(/\/$/, "");
   const links: { label: string; icon: IconName; path: string }[] = [
-    { label: "Overview", icon: "home", path: "/home/workflows" },
+    { label: "Workflows", icon: "flow", path: "/home/workflows" },
     { label: "Executions", icon: "pulse", path: "/home/executions" },
   ];
   return links.map(({ label, icon, path }) =>
@@ -66,7 +69,7 @@ function Row({ item, active }: { item: Item; active: boolean }) {
       rel={item.external ? "noreferrer" : undefined}
       className={`${ROW} border transition-colors ${
         active
-          ? "border-accent-line bg-accent-dim text-white"
+          ? "border-accent-line bg-accent-dim text-accent-strong"
           : "border-transparent text-muted hover:bg-panel-2 hover:text-ink"
       }`}
     >
@@ -96,15 +99,16 @@ function Label({ children }: { children: string }) {
   );
 }
 
-export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
+export function SideNav({ n8nBaseUrl, briefCount }: { n8nBaseUrl?: string; briefCount?: number }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const n8n = n8nItems(n8nBaseUrl);
+  const backoffice = backofficeItems(briefCount);
 
   return (
-    <aside className="flex flex-col gap-0.5 border-r border-line bg-[color-mix(in_srgb,var(--color-panel)_88%,black)] px-3 py-3.5">
-      <Link href="/brief" className="mb-2 flex items-center gap-2.5 px-2 py-1" aria-label="n8n Otto — home">
-        <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-gradient-to-br from-accent to-[#b8365a] shadow-[0_2px_8px_rgba(234,75,113,0.35)]">
+    <aside className="flex flex-col gap-0.5 border-r border-line bg-panel px-3 py-3.5">
+      <Link href="/overview" className="mb-2 flex items-center gap-2.5 px-2 py-1" aria-label="n8n Otto — home">
+        <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-accent shadow-[0_1px_2px_rgba(234,75,113,0.35)]">
           <Icon name="flow" size={15} className="text-white" strokeWidth={2} />
         </span>
         <span className="text-[13.5px] font-semibold tracking-[-0.01em]">
@@ -112,7 +116,7 @@ export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
         </span>
       </Link>
 
-      {BACKOFFICE.map((item) => (
+      {backoffice.map((item) => (
         <Row key={item.href} item={item} active={isActive(item.href)} />
       ))}
 
@@ -122,7 +126,7 @@ export function SideNav({ n8nBaseUrl }: { n8nBaseUrl?: string }) {
       ))}
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-line px-1 pt-3">
-        <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-gradient-to-br from-info to-ai text-[11px] font-bold text-white">
+        <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-ink text-[11px] font-bold text-white">
           GH
         </span>
         <div className="text-[12.5px] leading-tight font-medium">

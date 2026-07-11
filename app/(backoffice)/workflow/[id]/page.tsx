@@ -36,14 +36,14 @@ export default async function WorkflowDetail({
       />
 
       {item.disconnectedNodes.length > 0 && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#4a1f1a] bg-[#2a1512] px-4 py-3 text-[13px] text-[#ffb4ad]">
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-danger-bd bg-danger-bg px-4 py-3 text-[13px] text-danger-fg">
           <Icon name="warn" size={17} className="mt-0.5 flex-none text-danger" />
           <div>
-            <b className="text-white">
+            <b className="text-danger-strong">
               {item.disconnectedNodes.length} disconnected step(s) — unreachable from the trigger.
             </b>{" "}
             These will silently never run:{" "}
-            <span className="font-medium text-white">{item.disconnectedNodes.join(", ")}</span>.
+            <span className="font-medium text-danger-strong">{item.disconnectedNodes.join(", ")}</span>.
             Reconnect or remove them in n8n.
           </div>
         </div>

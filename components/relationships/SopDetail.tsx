@@ -145,7 +145,7 @@ export function SopDetail({ sop, members, addable }: SopDetailView) {
 
       {/* Danger zone */}
       <section className="border-t border-line pt-4">
-        <Button variant="ghost" onClick={deleteSop} disabled={disabled} className="!text-danger hover:!bg-[#2a1512]">
+        <Button variant="ghost" onClick={deleteSop} disabled={disabled} className="!text-danger-strong hover:!bg-danger-bg">
           Delete process
         </Button>
       </section>

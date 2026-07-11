@@ -122,10 +122,10 @@ export function CommandPalette() {
   return (
     <>
       <div
-        className="fixed inset-0 z-[50] bg-[rgba(6,7,10,0.62)] backdrop-blur-[3px]"
+        className="fixed inset-0 z-[50] bg-[rgba(20,20,26,0.32)] backdrop-blur-[2px]"
         onClick={close}
       />
-      <div className="animate-overlay-in fixed top-[88px] left-1/2 z-[51] w-[min(600px,92vw)] -translate-x-1/2 overflow-hidden rounded-2xl border border-line-2 bg-panel-2 shadow-[0_28px_80px_rgba(0,0,0,0.6)]">
+      <div className="animate-overlay-in fixed top-[88px] left-1/2 z-[51] w-[min(600px,92vw)] -translate-x-1/2 overflow-hidden rounded-2xl border border-line-2 bg-panel shadow-pop">
         <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
           <Icon name="search" size={17} className="text-muted" />
           <input

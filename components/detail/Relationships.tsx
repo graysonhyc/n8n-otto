@@ -172,8 +172,8 @@ export function Relationships({
       )}
 
       {detail.ifBreaks.length > 0 && (
-        <div className="mt-3 rounded-lg border border-[#4a1f1a] bg-[#2a1512] px-3 py-2.5 text-[12px] text-[#ffb4ad]">
-          <b className="text-white">If this breaks →</b>{" "}
+        <div className="mt-3 rounded-lg border border-danger-bd bg-danger-bg px-3 py-2.5 text-[12px] text-danger-fg">
+          <b className="text-danger-strong">If this breaks →</b>{" "}
           {detail.ifBreaks.map((x) => x.name).join(", ")} may be affected.
         </div>
       )}

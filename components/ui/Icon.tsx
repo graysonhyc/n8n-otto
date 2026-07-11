@@ -28,6 +28,8 @@ export type IconName =
   | "home"
   | "pulse"
   | "pencil"
+  | "sun"
+  | "moon"
   | "close";
 
 const PATHS: Record<IconName, ReactElement> = {
@@ -56,6 +58,8 @@ const PATHS: Record<IconName, ReactElement> = {
   home: <path d="M3 11l9-8 9 8 M5 10v9h14v-9" />,
   pulse: <path d="M3 12h4l2-5 4 12 2-7h6" />,
   pencil: <path d="M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />,
+  sun: <path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4" />,
+  moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
   close: <path d="M6 6l12 12 M18 6L6 18" />,
 };
 
