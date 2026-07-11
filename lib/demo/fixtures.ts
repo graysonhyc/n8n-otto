@@ -33,6 +33,10 @@ export const refundReviewAgent: N8nWorkflow = {
     { name: "Zendesk", type: "n8n-nodes-base.zendeskTool", credentials: { zendeskApi: { id: "cred_zendesk", name: "Zendesk" } } },
     { name: "Stripe lookup", type: "n8n-nodes-base.stripeTool", credentials: { stripeApi: { id: "cred_stripe", name: "Stripe" } } },
     { name: "Gmail draft", type: "n8n-nodes-base.gmailTool", credentials: { gmailOAuth2: { id: "cred_gmail", name: "Gmail" } } },
+    // Once the agent approves, it hands off to the Refund Execution sub-workflow
+    // to actually move the money — an executeWorkflow CALL edge, so the two form
+    // one auto-detected "Refund SOP" whose head step (this agent) is failing.
+    { name: "Execute refund", type: "n8n-nodes-base.executeWorkflow", parameters: { workflowId: "wf_refund_execution" } },
   ],
   connections: {
     "Zendesk ticket created": { main: [[{ node: "Refund Review Agent", type: "main", index: 0 }]] },
@@ -40,6 +44,7 @@ export const refundReviewAgent: N8nWorkflow = {
     Zendesk: { ai_tool: [[{ node: "Refund Review Agent", type: "ai_tool", index: 0 }]] },
     "Stripe lookup": { ai_tool: [[{ node: "Refund Review Agent", type: "ai_tool", index: 0 }]] },
     "Gmail draft": { ai_tool: [[{ node: "Refund Review Agent", type: "ai_tool", index: 0 }]] },
+    "Refund Review Agent": { main: [[{ node: "Execute refund", type: "main", index: 0 }]] },
   },
 };
 
@@ -239,6 +244,186 @@ export const contentOrchestrator: N8nWorkflow = {
   },
 };
 
+// ---- Billing / AR team (#billing-ops) --------------------------------------
+// The Refund SOP's downstream half. `Refund Execution` is the sub-workflow the
+// Refund Review Agent calls (executeWorkflow), so agent → execution is one
+// process. Both touch Stripe (shared credential → blast radius). Dunning Retry
+// is a sibling billing job that also shares the Stripe credential.
+
+const SHARED_JIRA = { id: "cred_jira", name: "Jira" };
+
+export const refundExecution: N8nWorkflow = {
+  id: "wf_refund_execution",
+  name: "Refund Execution",
+  active: true,
+  tags: [{ name: "production" }, { name: "billing" }],
+  homeProject: { id: "prj_billing", name: "Billing Ops" },
+  updatedAt: "2026-07-08T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 8 },
+  nodes: [
+    { name: "When called", type: "n8n-nodes-base.executeWorkflowTrigger" },
+    { name: "Issue Stripe refund", type: "n8n-nodes-base.stripe", credentials: { stripeApi: { id: "cred_stripe", name: "Stripe" } } },
+    { name: "HubSpot refund note", type: "n8n-nodes-base.hubspot", credentials: { hubspotApi: SHARED_HUBSPOT } },
+  ],
+  connections: {
+    "When called": { main: [[{ node: "Issue Stripe refund", type: "main", index: 0 }]] },
+    "Issue Stripe refund": { main: [[{ node: "HubSpot refund note", type: "main", index: 0 }]] },
+  },
+};
+
+export const dunningRetry: N8nWorkflow = {
+  id: "wf_dunning_retry",
+  name: "Dunning Retry",
+  active: true,
+  tags: [{ name: "production" }, { name: "billing" }],
+  homeProject: { id: "prj_billing", name: "Billing Ops" },
+  updatedAt: "2026-07-05T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 5 },
+  nodes: [
+    { name: "Every day 07:00", type: "n8n-nodes-base.scheduleTrigger", parameters: { rule: { interval: [{ field: "days" }] } } },
+    { name: "Retry failed charges", type: "n8n-nodes-base.stripe", credentials: { stripeApi: { id: "cred_stripe", name: "Stripe" } } },
+    { name: "Post to billing", type: "n8n-nodes-base.slack", parameters: { channel: "#billing-ops" }, credentials: { slackApi: { id: "cred_slack", name: "Slack" } } },
+  ],
+  connections: {
+    "Every day 07:00": { main: [[{ node: "Retry failed charges", type: "main", index: 0 }]] },
+    "Retry failed charges": { main: [[{ node: "Post to billing", type: "main", index: 0 }]] },
+  },
+};
+
+// ---- Customer Success team (#cs-ops) ---------------------------------------
+// Churn Risk Agent + Health Score Sync both read HubSpot (grows the HubSpot
+// credential blast radius). NPS Follow-up shares Gmail + Notion with other teams.
+
+export const churnRiskAgent: N8nWorkflow = {
+  id: "wf_churn_risk_agent",
+  name: "Churn Risk Agent",
+  active: true,
+  tags: [{ name: "production" }, { name: "cs" }],
+  homeProject: { id: "prj_cs", name: "Customer Success" },
+  updatedAt: "2026-07-06T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 20 },
+  nodes: [
+    { name: "Every day 06:00", type: "n8n-nodes-base.scheduleTrigger", parameters: { rule: { interval: [{ field: "days" }] } } },
+    { name: "Churn Risk Agent", type: "@n8n/n8n-nodes-langchain.agent", parameters: { options: { systemMessage: "Score accounts for churn risk and draft save-play outreach." } } },
+    { name: "OpenAI GPT-4o", type: "@n8n/n8n-nodes-langchain.lmChatOpenAi", parameters: { model: "gpt-4o" } },
+    { name: "HubSpot", type: "n8n-nodes-base.hubspotTool", credentials: { hubspotApi: SHARED_HUBSPOT } },
+    { name: "Post to CS", type: "n8n-nodes-base.slack", parameters: { channel: "#cs-ops" }, credentials: { slackApi: { id: "cred_slack", name: "Slack" } } },
+  ],
+  connections: {
+    "Every day 06:00": { main: [[{ node: "Churn Risk Agent", type: "main", index: 0 }]] },
+    "OpenAI GPT-4o": { ai_languageModel: [[{ node: "Churn Risk Agent", type: "ai_languageModel", index: 0 }]] },
+    HubSpot: { ai_tool: [[{ node: "Churn Risk Agent", type: "ai_tool", index: 0 }]] },
+    "Churn Risk Agent": { main: [[{ node: "Post to CS", type: "main", index: 0 }]] },
+  },
+};
+
+export const npsFollowup: N8nWorkflow = {
+  id: "wf_nps_followup",
+  name: "NPS Follow-up",
+  active: true,
+  tags: [{ name: "production" }, { name: "cs" }],
+  homeProject: { id: "prj_cs", name: "Customer Success" },
+  updatedAt: "2026-06-28T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 4 },
+  nodes: [
+    { name: "Survey response", type: "n8n-nodes-base.webhook", parameters: { path: "nps" } },
+    { name: "Score branch", type: "n8n-nodes-base.if" },
+    { name: "Send follow-up", type: "n8n-nodes-base.gmail", credentials: { gmailOAuth2: { id: "cred_gmail", name: "Gmail" } } },
+    { name: "Notion log", type: "n8n-nodes-base.notion", credentials: { notionApi: { id: "cred_notion", name: "Notion" } } },
+  ],
+  connections: {
+    "Survey response": { main: [[{ node: "Score branch", type: "main", index: 0 }]] },
+    "Score branch": { main: [[{ node: "Send follow-up", type: "main", index: 0 }]] },
+    "Send follow-up": { main: [[{ node: "Notion log", type: "main", index: 0 }]] },
+  },
+};
+
+export const healthScoreSync: N8nWorkflow = {
+  id: "wf_health_score_sync",
+  name: "Health Score Sync",
+  active: true,
+  tags: [{ name: "production" }, { name: "cs" }],
+  homeProject: { id: "prj_cs", name: "Customer Success" },
+  updatedAt: "2026-06-25T10:00:00.000Z",
+  nodes: [
+    { name: "Every hour", type: "n8n-nodes-base.scheduleTrigger", parameters: { rule: { interval: [{ field: "hours" }] } } },
+    { name: "HubSpot read", type: "n8n-nodes-base.hubspot", credentials: { hubspotApi: SHARED_HUBSPOT } },
+    { name: "CS health sheet", type: "n8n-nodes-base.googleSheets", parameters: { documentId: "sheet_cs_health", sheetName: "Scores" }, credentials: { googleSheetsOAuth2Api: { id: "cred_gsheets", name: "Google Sheets" } } },
+  ],
+  connections: {
+    "Every hour": { main: [[{ node: "HubSpot read", type: "main", index: 0 }]] },
+    "HubSpot read": { main: [[{ node: "CS health sheet", type: "main", index: 0 }]] },
+  },
+};
+
+// ---- IT & Security team (#it-ops) ------------------------------------------
+// Employee Offboarding CALLS Access Provisioning (executeWorkflow) → one auto
+// "IT SOP". Access Provisioning + Incident Triage share the Jira credential.
+// Incident Triage is the second failing workflow (routes to a DIFFERENT owner
+// channel than the Refund failure — demonstrates per-team routing).
+
+export const accessProvisioning: N8nWorkflow = {
+  id: "wf_access_provisioning",
+  name: "Access Provisioning",
+  active: true,
+  tags: [{ name: "production" }, { name: "it" }],
+  homeProject: { id: "prj_it", name: "IT & Security" },
+  updatedAt: "2026-07-04T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 15 },
+  nodes: [
+    { name: "When called", type: "n8n-nodes-base.executeWorkflowTrigger" },
+    { name: "Okta provision", type: "n8n-nodes-base.httpRequest", parameters: { url: "https://acme.okta.com/api/v1/users" } },
+    { name: "Jira access ticket", type: "n8n-nodes-base.jira", credentials: { jiraSoftwareCloudApi: SHARED_JIRA } },
+    { name: "Notify IT", type: "n8n-nodes-base.slack", parameters: { channel: "#it-ops" }, credentials: { slackApi: { id: "cred_slack", name: "Slack" } } },
+  ],
+  connections: {
+    "When called": { main: [[{ node: "Okta provision", type: "main", index: 0 }]] },
+    "Okta provision": { main: [[{ node: "Jira access ticket", type: "main", index: 0 }]] },
+    "Jira access ticket": { main: [[{ node: "Notify IT", type: "main", index: 0 }]] },
+  },
+};
+
+export const incidentTriageAgent: N8nWorkflow = {
+  id: "wf_incident_triage_agent",
+  name: "Incident Triage Agent",
+  active: true,
+  tags: [{ name: "production" }, { name: "it" }],
+  homeProject: { id: "prj_it", name: "IT & Security" },
+  updatedAt: "2026-07-07T10:00:00.000Z",
+  nodes: [
+    { name: "PagerDuty alert", type: "n8n-nodes-base.webhook", parameters: { path: "pagerduty" } },
+    { name: "Incident Triage Agent", type: "@n8n/n8n-nodes-langchain.agent", parameters: { options: { systemMessage: "Triage the incident, summarise blast radius, and open a ticket." } } },
+    { name: "OpenAI GPT-4o", type: "@n8n/n8n-nodes-langchain.lmChatOpenAi", parameters: { model: "gpt-4o" } },
+    { name: "Jira", type: "n8n-nodes-base.jiraTool", credentials: { jiraSoftwareCloudApi: SHARED_JIRA } },
+    { name: "Slack IT", type: "n8n-nodes-base.slackTool", parameters: { channel: "#it-ops" }, credentials: { slackApi: { id: "cred_slack", name: "Slack" } } },
+  ],
+  connections: {
+    "PagerDuty alert": { main: [[{ node: "Incident Triage Agent", type: "main", index: 0 }]] },
+    "OpenAI GPT-4o": { ai_languageModel: [[{ node: "Incident Triage Agent", type: "ai_languageModel", index: 0 }]] },
+    Jira: { ai_tool: [[{ node: "Incident Triage Agent", type: "ai_tool", index: 0 }]] },
+    "Slack IT": { ai_tool: [[{ node: "Incident Triage Agent", type: "ai_tool", index: 0 }]] },
+  },
+};
+
+export const employeeOffboarding: N8nWorkflow = {
+  id: "wf_employee_offboarding",
+  name: "Employee Offboarding",
+  active: true,
+  tags: [{ name: "production" }, { name: "it" }, { name: "hr" }],
+  homeProject: { id: "prj_it", name: "IT & Security" },
+  updatedAt: "2026-07-02T10:00:00.000Z",
+  settings: { timeSavedPerExecution: 25 },
+  nodes: [
+    { name: "Offboarding request", type: "n8n-nodes-base.formTrigger" },
+    { name: "Revoke access", type: "n8n-nodes-base.executeWorkflow", parameters: { workflowId: "wf_access_provisioning" } },
+    { name: "Notion log", type: "n8n-nodes-base.notion", credentials: { notionApi: { id: "cred_notion", name: "Notion" } } },
+  ],
+  connections: {
+    "Offboarding request": { main: [[{ node: "Revoke access", type: "main", index: 0 }]] },
+    "Revoke access": { main: [[{ node: "Notion log", type: "main", index: 0 }]] },
+  },
+};
+
 export const allWorkflows: N8nWorkflow[] = [
   refundReviewAgent,
   customerOnboarding,
@@ -250,6 +435,17 @@ export const allWorkflows: N8nWorkflow[] = [
   syncYoutube,
   syncLinkedin,
   contentOrchestrator,
+  // Billing / AR
+  refundExecution,
+  dunningRetry,
+  // Customer Success
+  churnRiskAgent,
+  npsFollowup,
+  healthScoreSync,
+  // IT & Security
+  accessProvisioning,
+  incidentTriageAgent,
+  employeeOffboarding,
 ];
 
 // Builds N successful executions for a workflow on 2026-07-09, spaced through the
@@ -292,4 +488,23 @@ export const executions: N8nExecution[] = [
   ...successRuns("wf_welcome_email_agent", 16, 6),
   ...successRuns("wf_pto_approval_bot", 5, 45),
   ...successRuns("wf_revenue_report_agent", 1, 38),
+  // New teams — healthy volume, except Incident Triage which is the SECOND
+  // failing workflow (owned by a different team → routes to #it-ops, not
+  // #support-ops; demonstrates per-owner routing of live failures).
+  ...successRuns("wf_refund_execution", 5, 3, 7),
+  ...successRuns("wf_dunning_retry", 3, 20, 7),
+  ...successRuns("wf_churn_risk_agent", 1, 40, 6),
+  ...successRuns("wf_nps_followup", 9, 3, 8),
+  ...successRuns("wf_health_score_sync", 11, 2, 6),
+  ...successRuns("wf_access_provisioning", 4, 8, 9),
+  ...successRuns("wf_employee_offboarding", 2, 30, 10),
+  ...successRuns("wf_incident_triage_agent", 4, 12, 11),
+  ...Array.from({ length: 3 }, (_, i) => ({
+    id: `ex_incident_${i}`,
+    workflowId: "wf_incident_triage_agent",
+    finished: true,
+    status: "error" as const,
+    startedAt: `2026-07-09T16:${20 + i}:00.000Z`,
+    stoppedAt: `2026-07-09T16:${20 + i}:04.000Z`,
+  })),
 ];

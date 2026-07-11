@@ -12,10 +12,12 @@ describe("computeYesterday", () => {
   const y = computeYesterday(items, executions, NOW);
 
   it("counts every production run from yesterday", () => {
-    // 6 refund errors + 18 + 42 + 16 + 5 + 1 successes
-    expect(y.runs).toBe(88);
-    expect(y.errors).toBe(6);
-    expect(y.tasksSolved).toBe(82);
+    // Original estate: 6 refund errors + (18+42+16+5+1) successes = 88 runs.
+    // Expanded estate adds Billing/CS/IT teams: +39 successes and +3 Incident
+    // Triage errors → 130 runs, 9 errors (6 refund + 3 incident), 121 solved.
+    expect(y.runs).toBe(130);
+    expect(y.errors).toBe(9);
+    expect(y.tasksSolved).toBe(121);
   });
 
   it("reports an error percentage", () => {
@@ -24,9 +26,9 @@ describe("computeYesterday", () => {
   });
 
   it("estimates time saved, flagging when defaults were used", () => {
-    // onboarding 18*12 + lead 42*3 + welcome 16*8 + pto 5*8 + revenue 1*30
-    // (pto is ai-assisted now that human-in-loop is no longer its own type)
-    expect(y.timeSavedMinutes).toBe(540);
+    // Original 540 (onboarding/lead/welcome/pto/revenue) + the new teams'
+    // configured & default time-saved per run → 854.
+    expect(y.timeSavedMinutes).toBe(854);
     expect(y.timeSavedEstimated).toBe(true);
   });
 
@@ -44,7 +46,7 @@ describe("computeYesterday", () => {
       ...executions,
       { id: "old", workflowId: "wf_lead_routing", finished: true, status: "success" as const, startedAt: "2026-07-01T10:00:00.000Z", stoppedAt: "2026-07-01T10:00:02.000Z" },
     ];
-    expect(computeYesterday(items, older, NOW).runs).toBe(88);
+    expect(computeYesterday(items, older, NOW).runs).toBe(130);
   });
 });
 

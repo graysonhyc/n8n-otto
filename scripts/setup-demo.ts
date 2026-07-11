@@ -21,6 +21,10 @@ const CHANNELS = [
   "people-ops",
   "finance",
   "cs-alerts",
+  // New demo teams (each owns workflows in the expanded estate)
+  "billing-ops",
+  "cs-ops",
+  "it-ops",
 ];
 
 async function ensureChannels(client: WebClient): Promise<Map<string, string>> {
