@@ -11,7 +11,7 @@
  *   pnpm tsx scripts/ask-otto.ts "is the refund process healthy?"
  */
 import { createN8nClient } from "@/lib/n8n/client";
-import { getAllOwners, getAllLinks } from "@/lib/backoffice/store";
+import { getAllOwners, getAllLinks, listSops } from "@/lib/backoffice/store";
 import { composeAgentContext, type AgentContext } from "@/lib/agent/context";
 import { allWorkflows, executions as demoExecutions } from "@/lib/demo/fixtures";
 import { agentToolset } from "@/lib/agent/actions";
@@ -22,17 +22,25 @@ import { runAgent, type ChatClient } from "@/lib/agent/run";
 // Assemble the agent context directly (n8n client + store), bypassing the
 // Next-runtime unstable_cache that buildAgentContext relies on.
 async function loadContext(): Promise<AgentContext> {
-  const [owners, links] = await Promise.all([
+  const [owners, links, sopRows] = await Promise.all([
     getAllOwners(),
     getAllLinks(),
+    listSops(),
   ]);
   const groupNames = new Map<string, string>();
+  // Same authored-SOP shape buildAgentContext passes, so the CLI answers about
+  // hand-authored SOPs (e.g. Finance) exactly like Slack does.
+  const sops = sopRows.map((s) => ({
+    id: s.id,
+    name: s.name,
+    workflowIds: s.members.map((m) => m.workflowId),
+  }));
   const baseUrl = process.env.N8N_BASE_URL;
   const apiKey = process.env.N8N_API_KEY;
   if (baseUrl && apiKey) {
     const client = createN8nClient(baseUrl, apiKey);
     const [workflows, executions] = await Promise.all([client.listWorkflows(), client.listExecutions()]);
-    return composeAgentContext({ workflows, executions, owners, links, groupNames, now: Date.now(), live: true });
+    return composeAgentContext({ workflows, executions, owners, links, groupNames, sops, now: Date.now(), live: true });
   }
   return composeAgentContext({
     workflows: allWorkflows,
@@ -40,6 +48,7 @@ async function loadContext(): Promise<AgentContext> {
     owners,
     links,
     groupNames,
+    sops,
     now: Date.now(),
     live: false,
   });

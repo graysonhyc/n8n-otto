@@ -29,9 +29,11 @@ function resolveChannel(memberIds: string[], owners: Map<string, Owner>): string
 }
 
 /**
- * Post any not-yet-acted-on SOP suggestion to Slack, then mark it `notified` so
- * the next sweep does not repost it. Dismissed and already-notified suggestions
- * are skipped (both carry a state row).
+ * Post every SOP suggestion that is currently in the list — i.e. still detected
+ * and not explicitly dismissed — on each (daily) run. This matches the /map
+ * suggestions view exactly: only a Dismiss suppresses a suggestion; a prior
+ * notify does NOT, so a still-relevant SOP is re-surfaced to Slack every day
+ * until the team acts on it (creates the SOP or dismisses it).
  */
 export async function runSuggestionSweep(): Promise<SuggestionSweepResult> {
   const install = await getSlackInstall();
@@ -48,9 +50,10 @@ export async function runSuggestionSweep(): Promise<SuggestionSweepResult> {
   for (const s of sops) for (const m of s.members) sopByWorkflow.set(m.workflowId, { id: s.id, name: s.name });
   const names = new Map(workflows.map((w) => [w.id, w.name]));
 
-  // Any suggestion with a state row (dismissed OR notified) is already handled.
-  const acted = new Set(states.keys());
-  const raw = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed: acted });
+  // Only an explicit Dismiss suppresses a suggestion (same rule the /map view
+  // uses). A prior notify does not — so current suggestions are re-sent daily.
+  const dismissed = new Set([...states].filter(([, status]) => status === "dismissed").map(([id]) => id));
+  const raw = classifySuggestions({ clusters: buildClusters(workflows), sopByWorkflow, dismissed });
   const fresh = await enrichSuggestions(raw, { workflows, executions, owners });
 
   let posted = 0;
