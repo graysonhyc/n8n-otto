@@ -2,6 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { n8nFromEnv } from "@/lib/n8n/client";
 import { allWorkflows, executions as demoExecutions } from "@/lib/demo/fixtures";
+import { demoExecutionOverlay } from "@/lib/demo/executions";
 import type { N8nExecution, N8nWorkflow } from "@/lib/n8n/types";
 
 export interface Instance {
@@ -34,10 +35,20 @@ const fetchLiveInstance = unstable_cache(
 );
 
 // Reads the configured n8n instance, or falls back to the demo fixtures so the
-// app renders end-to-end before real credentials are wired.
+// app renders end-to-end before real credentials are wired. When DEMO_EXECUTIONS
+// is set, a synthetic ~10-day execution history is overlaid onto the live
+// workflows so the brief/errors/ROI surfaces have meaningful data for a demo
+// (the instance itself is barely exercised). See lib/demo/executions.ts.
 export async function loadInstance(): Promise<Instance> {
   if (!n8nFromEnv()) {
     return { workflows: allWorkflows, executions: demoExecutions, live: false };
   }
-  return fetchLiveInstance();
+  const instance = await fetchLiveInstance();
+  if (process.env.DEMO_EXECUTIONS === "1") {
+    return {
+      ...instance,
+      executions: [...instance.executions, ...demoExecutionOverlay(instance.workflows, Date.now())],
+    };
+  }
+  return instance;
 }

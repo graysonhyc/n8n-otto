@@ -14,6 +14,7 @@ import { createN8nClient } from "@/lib/n8n/client";
 import { getAllOwners, getAllLinks, listSops } from "@/lib/backoffice/store";
 import { composeAgentContext, type AgentContext } from "@/lib/agent/context";
 import { allWorkflows, executions as demoExecutions } from "@/lib/demo/fixtures";
+import { demoExecutionOverlay } from "@/lib/demo/executions";
 import { agentToolset } from "@/lib/agent/actions";
 import { openaiFromEnv } from "@/lib/agent/openai";
 import { linearFromEnv } from "@/lib/linear/client";
@@ -39,7 +40,12 @@ async function loadContext(): Promise<AgentContext> {
   const apiKey = process.env.N8N_API_KEY;
   if (baseUrl && apiKey) {
     const client = createN8nClient(baseUrl, apiKey);
-    const [workflows, executions] = await Promise.all([client.listWorkflows(), client.listExecutions()]);
+    const [workflows, liveExec] = await Promise.all([client.listWorkflows(), client.listExecutions()]);
+    // Mirror loadInstance: overlay demo executions when DEMO_EXECUTIONS is set.
+    const executions =
+      process.env.DEMO_EXECUTIONS === "1"
+        ? [...liveExec, ...demoExecutionOverlay(workflows, Date.now())]
+        : liveExec;
     return composeAgentContext({ workflows, executions, owners, links, groupNames, sops, now: Date.now(), live: true });
   }
   return composeAgentContext({
