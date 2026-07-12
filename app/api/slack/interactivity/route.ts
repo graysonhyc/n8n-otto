@@ -46,7 +46,7 @@ async function runAction(actionId: string, value: Record<string, string>): Promi
     case "create_sop_from_suggestion":
       if (value.memberIds) {
         const ids = JSON.parse(value.memberIds) as string[];
-        await createSop(value.name || `Process (${ids.length} workflows)`, ids);
+        await createSop(value.name || `Process (${ids.length} workflows)`, ids, value.description || null);
         if (value.suggestionId) await setSuggestionState(value.suggestionId, "notified");
       }
       return "✓ SOP created in Otto. Ask me “is that process healthy?” to see it end-to-end.";

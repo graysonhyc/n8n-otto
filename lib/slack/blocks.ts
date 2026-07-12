@@ -90,19 +90,34 @@ export function ownershipCheckBlocks(input: {
   ];
 }
 
+// A meaningful default SOP name for a suggestion, so a one-click Create SOP does
+// not land a generic "Process (2 workflows)". Prefer the shared resource the
+// cluster is built around (e.g. a Google Sheet), else the member workflow names.
+function suggestionSopName(s: SopSuggestion, names?: Map<string, string>): string {
+  const shared = s.basis.sharedResource;
+  if (shared?.name) return `${shared.name} sync`;
+  const memberNames = s.memberNames ?? s.memberIds.map((id) => names?.get(id) ?? id);
+  if (memberNames.length) return memberNames.slice(0, 2).join(" + ");
+  return `Process (${s.memberIds.length} workflows)`;
+}
+
 // An SOP suggestion as a Slack card: the team can create the SOP (or add the
 // missing workflows to an existing one) or dismiss it, all without leaving Slack.
 // `names` maps workflow id → name for a readable member list; ids fall back to
 // themselves. `memberIds` is JSON-encoded inside `value` because Slack action
 // values are flat strings on the way back through the interactivity handler.
 export function suggestionBlocks(s: SopSuggestion, names?: Map<string, string>): KnownBlock[] {
-  const autoName = `Process (${s.memberIds.length} workflows)`;
+  const autoName = suggestionSopName(s, names);
+  // The LLM "why this is an SOP" makes a good SOP description; fall back to the
+  // deterministic reason. Capped so it fits inside Slack's action-value budget.
+  const description = (s.rationale ?? s.reason).slice(0, 1200);
   const value = JSON.stringify({
     suggestionId: s.id,
     memberIds: JSON.stringify(s.memberIds),
     kind: s.kind,
     targetSopId: s.targetSopId ?? "",
     name: autoName,
+    description,
   });
   const memberList = (s.memberNames ?? s.memberIds.map((id) => names?.get(id) ?? id)).join(", ");
   const title =

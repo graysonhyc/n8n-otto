@@ -51,6 +51,20 @@ describe("suggestionBlocks", () => {
     expect(JSON.parse(value.memberIds)).toEqual(["a", "b", "c"]);
   });
 
+  it("carries a meaningful name + description so Create SOP isn't generic", () => {
+    // shared-resource cluster → named after the resource, described by the rationale
+    const els = actions(suggestionBlocks({ ...addToSop, kind: "new-sop", rationale: "These keep the orders table in sync." }));
+    const value = JSON.parse(els[0].value) as Record<string, string>;
+    expect(value.name).toBe("orders sync");
+    expect(value.description).toBe("These keep the orders table in sync.");
+  });
+
+  it("names a call-chain cluster from its member workflow names", () => {
+    const els = actions(suggestionBlocks({ ...newSop, memberNames: ["Sync Youtube", "Sync Linked"] }));
+    const value = JSON.parse(els[0].value) as Record<string, string>;
+    expect(value.name).toBe("Sync Youtube + Sync Linked");
+  });
+
   it("renders workflow names when a name map is supplied", () => {
     const blocks = suggestionBlocks(newSop, new Map([["a", "Alpha"], ["b", "Beta"]]));
     const ctx = blocks.find((b) => b.type === "context") as { elements: Array<{ text: string }> };
