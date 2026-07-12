@@ -12,8 +12,9 @@ export type SendBriefResult =
 
 // Posts one Otto-narrated daily brief per Slack channel, scoped to the workflows
 // owned in that channel, then the channel's attention items as interactive cards.
-// Workflows with no channel are skipped; there is no master channel. Shared by the
-// manual "Send to Slack" action and the 09:00 CEST cron.
+// Workflows with no owner channel fall back to SLACK_MASTER_CHANNEL_ID (the
+// catch-all ops channel) via loadChannelBriefs; only when that is unset too are
+// they skipped. Shared by the manual "Send to Slack" action and the morning cron.
 export async function sendDailyBrief(): Promise<SendBriefResult> {
   const install = await getSlackInstall();
   if (!install) return { ok: false, status: 400, error: "Slack not connected" };

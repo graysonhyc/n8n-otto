@@ -9,6 +9,7 @@ import { blastRadius, type BlastRadius } from "@/lib/derive/blast";
 import { buildBrief, type BriefItem } from "@/lib/brief/build";
 import { computeDailyBrief, type DailyBrief } from "@/lib/brief/daily";
 import { groupBriefsByChannel, type ChannelBrief } from "@/lib/brief/channels";
+import { masterChannelId } from "@/lib/slack/post";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner, ManualLink } from "@/lib/backoffice/types";
 
@@ -127,6 +128,14 @@ export async function loadChannelBriefs(): Promise<ChannelBriefsView> {
     (b) => states.get(b.key) !== "dismissed",
   );
 
-  const channels = groupBriefsByChannel({ items, executions, changes, attention, sharedCredentials, now });
+  const channels = groupBriefsByChannel({
+    items,
+    executions,
+    changes,
+    attention,
+    sharedCredentials,
+    now,
+    masterChannelId: masterChannelId(),
+  });
   return { channels, live, scanned };
 }

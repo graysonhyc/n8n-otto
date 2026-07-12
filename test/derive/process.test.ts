@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeProcessGroups } from "@/lib/derive/process";
+import { computeProcessGroups, mergeAuthoredGroups, type ProcessGroup } from "@/lib/derive/process";
 import type { ManualLink } from "@/lib/backoffice/types";
 
 const link = (fromId: string, toId: string, relation = "part-of-process"): ManualLink => ({
@@ -38,5 +38,44 @@ describe("computeProcessGroups", () => {
   it("keeps separate components as separate groups", () => {
     const groups = computeProcessGroups([link("a", "b"), link("c", "d")], new Map());
     expect(groups).toHaveLength(2);
+  });
+});
+
+describe("mergeAuthoredGroups", () => {
+  const derived: ProcessGroup[] = [
+    { key: "pg:a|b|c", name: "Business process", workflowIds: ["a", "b", "c"] },
+  ];
+
+  it("surfaces a one-workflow authored SOP the auto-detector would never form", () => {
+    const merged = mergeAuthoredGroups(
+      [{ id: "fin1", name: "Finance SOP", workflowIds: ["z"] }],
+      [],
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ key: "sop:fin1", name: "Finance SOP", workflowIds: ["z"] });
+  });
+
+  it("lets an authored SOP claim workflows away from an overlapping derived cluster", () => {
+    const merged = mergeAuthoredGroups(
+      [{ id: "fin1", name: "Finance SOP", workflowIds: ["b"] }],
+      derived,
+    );
+    const authored = merged.find((g) => g.key === "sop:fin1")!;
+    const leftover = merged.find((g) => g.key === "pg:a|b|c")!;
+    expect(authored.workflowIds).toEqual(["b"]);
+    expect(leftover.workflowIds).toEqual(["a", "c"]); // b removed, still >=2 so kept
+  });
+
+  it("drops a derived cluster that falls below two steps after the SOP claims it", () => {
+    const twoStep: ProcessGroup[] = [{ key: "pg:a|b", name: "Business process", workflowIds: ["a", "b"] }];
+    const merged = mergeAuthoredGroups(
+      [{ id: "fin1", name: "Finance SOP", workflowIds: ["b"] }],
+      twoStep,
+    );
+    expect(merged.map((g) => g.key)).toEqual(["sop:fin1"]);
+  });
+
+  it("returns derived groups unchanged when there are no authored SOPs", () => {
+    expect(mergeAuthoredGroups([], derived)).toEqual(derived);
   });
 });

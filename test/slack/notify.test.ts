@@ -94,6 +94,28 @@ describe("notifyNewItems", () => {
     expect(res.posted).toBe(0);
   });
 
+  it("falls back to the master channel when an item has no owner channel", async () => {
+    const d = deps({
+      items: [item("shared:c1", null), item("incident:w1", "w1")],
+      owners: new Map([["w1", owner("w1", null)]]), // owner but no channel
+      masterChannelId: "C_MASTER",
+    });
+    const res = await notifyNewItems(d);
+    expect(d.post).toHaveBeenCalledWith("C_MASTER", d.items[0]);
+    expect(d.post).toHaveBeenCalledWith("C_MASTER", d.items[1]);
+    expect(res.posted).toBe(2);
+  });
+
+  it("prefers the owner channel over the master channel when both exist", async () => {
+    const d = deps({
+      items: [item("incident:w1", "w1")],
+      owners: new Map([["w1", owner("w1", "C_OWNER")]]),
+      masterChannelId: "C_MASTER",
+    });
+    await notifyNewItems(d);
+    expect(d.post).toHaveBeenCalledWith("C_OWNER", d.items[0]);
+  });
+
   it("re-arms notified keys whose condition has resolved", async () => {
     const d = deps({
       items: [], // nothing current

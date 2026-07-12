@@ -10,7 +10,7 @@ import {
   touchSweep,
 } from "@/lib/backoffice/store";
 import { loadBrief } from "@/lib/data/brief";
-import { postBlocks } from "@/lib/slack/post";
+import { masterChannelId, postBlocks } from "@/lib/slack/post";
 import { briefItemBlocks } from "@/lib/slack/blocks";
 import { notifyNewItems } from "@/lib/slack/notify";
 
@@ -50,6 +50,7 @@ export async function runNotifySweep(opts?: { debounceMs?: number }): Promise<Sw
     post: (channelId, item) => postBlocks(install.botToken, channelId, briefItemBlocks(item), item.title),
     markNotified,
     clearNotified,
+    masterChannelId: masterChannelId(),
   });
   return { ok: true, ...res };
 }

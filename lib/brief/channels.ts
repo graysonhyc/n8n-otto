@@ -13,9 +13,11 @@ export interface ChannelBrief {
 
 // Split the estate into one brief per Slack channel. The channel comes from each
 // workflow's owner assignment (owner.slackChannelId); workflows with no channel
-// are skipped entirely. computeDailyBrief self-scopes on the items passed (it
-// builds its own id index and ignores executions/changes for unknown ids), so we
-// only need to filter items, shared credentials, and attention per channel.
+// fall back to `masterChannelId` (the catch-all ops channel) when one is given,
+// and are skipped only when there is no fallback either. computeDailyBrief
+// self-scopes on the items passed (it builds its own id index and ignores
+// executions/changes for unknown ids), so we only need to filter items, shared
+// credentials, and attention per channel.
 export function groupBriefsByChannel(input: {
   items: RegistryItem[];
   executions: N8nExecution[];
@@ -24,10 +26,11 @@ export function groupBriefsByChannel(input: {
   sharedCredentials: SharedCredentialInfo[];
   now: number;
   offsetMin?: number;
+  masterChannelId?: string;
 }): ChannelBrief[] {
   const buckets = new Map<string, { channelName: string | null; ids: Set<string> }>();
   for (const item of input.items) {
-    const channelId = item.owner?.slackChannelId;
+    const channelId = item.owner?.slackChannelId ?? input.masterChannelId;
     if (!channelId) continue;
     let bucket = buckets.get(channelId);
     if (!bucket) {

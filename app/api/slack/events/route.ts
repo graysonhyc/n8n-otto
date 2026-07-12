@@ -49,6 +49,13 @@ export async function POST(request: Request) {
   const client = slackClient(botToken);
 
   after(async () => {
+    // Untagged thread replies: confirm Otto is actually part of this thread (it
+    // posted the brief/alert or was mentioned earlier) before doing any work —
+    // otherwise it would wake up on every message in the channel. A prior
+    // assistant-role message in the thread is the signal.
+    let history = await fetchThreadHistory(botToken, channel, threadTs, messageTs);
+    if (parsed.kind === "reply" && !history.some((m) => m.role === "assistant")) return;
+
     // "on it" affordance — the Claude-tag working state.
     void client.reactions.add({ channel, timestamp: messageTs, name: "eyes" }).catch(() => {});
     const placeholder = await client.chat
@@ -72,10 +79,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      const [context, history] = await Promise.all([
-        buildAgentContext(),
-        fetchThreadHistory(botToken, channel, threadTs, messageTs),
-      ]);
+      const context = await buildAgentContext();
       const { tools, runTool } = agentToolset(linearFromEnv());
       // A bare "@n8n-otto" with no question → introduce + suggest actions.
       const userText = text || "The user tagged you with no question. Introduce yourself and suggest what I can ask.";

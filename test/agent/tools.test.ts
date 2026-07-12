@@ -83,6 +83,47 @@ describe("agent tools", () => {
     for (const r of res.results) expect(["high", "medium", "low"]).toContain(r.rotationRisk);
   });
 
+  it("get_attention_items returns the ranked brief items with a severity breakdown", () => {
+    const res = dispatch("get_attention_items", {}, ctx) as {
+      total: number;
+      bySeverity: Record<string, number>;
+      items: Array<{ severity: string; category: string; title: string }>;
+    };
+    expect(res.total).toBe(ctx.attention.length);
+    expect(res.items.length).toBe(ctx.attention.length);
+    expect(res.bySeverity.high + res.bySeverity.medium + res.bySeverity.low).toBe(res.total);
+    // highest-severity first (buildBrief sorts by severity)
+    if (res.items.length > 1) {
+      const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      expect(rank[res.items[0].severity]).toBeLessThanOrEqual(rank[res.items[res.items.length - 1].severity]);
+    }
+  });
+
+  it("get_attention_items filters by severity", () => {
+    const res = dispatch("get_attention_items", { severity: "high" }, ctx) as {
+      items: Array<{ severity: string }>;
+    };
+    expect(res.items.every((i) => i.severity === "high")).toBe(true);
+  });
+
+  it("list_failures rolls up error/crashed executions per workflow, most-failing first", () => {
+    const res = dispatch("list_failures", { sinceDays: 3650 }, ctx) as {
+      totalFailedExecutions: number;
+      workflowsAffected: number;
+      results: Array<{ id: string; name: string; failures: number; lastFailureAt: string }>;
+    };
+    const expected = executions.filter((e) => e.status === "error" || e.status === "crashed").length;
+    expect(res.totalFailedExecutions).toBe(expected);
+    expect(res.workflowsAffected).toBe(res.results.length);
+    for (let i = 1; i < res.results.length; i++) {
+      expect(res.results[i - 1].failures).toBeGreaterThanOrEqual(res.results[i].failures);
+    }
+    // each result names a real workflow and a parseable timestamp
+    for (const r of res.results) {
+      expect(Number.isNaN(Date.parse(r.lastFailureAt))).toBe(false);
+    }
+  });
+
   it("throws on an unknown tool", () => {
     expect(() => dispatch("frobnicate", {}, ctx)).toThrow(/unknown tool/i);
   });

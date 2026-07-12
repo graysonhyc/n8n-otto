@@ -6,7 +6,12 @@ import {
   sharedCredentialEdges,
   systemEdges,
 } from "./edges";
-import { computeProcessGroupsMerged, type ProcessGroup } from "./process";
+import {
+  computeProcessGroupsMerged,
+  mergeAuthoredGroups,
+  type AuthoredSop,
+  type ProcessGroup,
+} from "./process";
 
 export type ColorBy = "risk" | "type" | "owner";
 
@@ -75,15 +80,18 @@ export interface ComposeGraphInput {
   links: ManualLink[];
   groupNames: Map<string, string>;
   now: number;
+  /** Hand-authored SOPs. When present they override auto-detected clusters. */
+  sops?: AuthoredSop[];
 }
 
 const systemNodeId = (name: string) => `system:${name}`;
 
 export function composeGraph(input: ComposeGraphInput): WorkflowGraph {
-  const { workflows, executions, owners, links, groupNames, now } = input;
+  const { workflows, executions, owners, links, groupNames, now, sops } = input;
   const ids = new Set(workflows.map((w) => w.id));
 
-  const groups = computeProcessGroupsMerged(workflows, links, groupNames);
+  const derivedGroups = computeProcessGroupsMerged(workflows, links, groupNames);
+  const groups = sops?.length ? mergeAuthoredGroups(sops, derivedGroups) : derivedGroups;
   const groupByWorkflow = new Map<string, string>();
   for (const g of groups) {
     for (const wid of g.workflowIds) groupByWorkflow.set(wid, g.key);

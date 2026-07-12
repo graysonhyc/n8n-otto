@@ -100,6 +100,14 @@ export async function getSnapshot(
   return row ? { hash: row.hash, json: row.json } : null;
 }
 
+// All snapshots in one query, keyed by workflow id. runSync needs every
+// workflow's prior snapshot per render; a single findMany replaces N serial
+// findUnique round-trips to the pooler.
+export async function getAllSnapshots(): Promise<Map<string, { hash: string; json: string }>> {
+  const rows = await prisma.workflowSnapshot.findMany();
+  return new Map(rows.map((r) => [r.workflowId, { hash: r.hash, json: r.json }]));
+}
+
 export async function putSnapshot(
   workflowId: string,
   hash: string,
@@ -110,6 +118,24 @@ export async function putSnapshot(
     create: { workflowId, hash, json },
     update: { hash, json },
   });
+}
+
+// Batched upsert of many snapshots in a single round-trip. runSync only writes
+// rows that are new or whose hash actually changed, so in steady state this is
+// called with an empty list (no-op) and never touches the DB.
+export async function putSnapshots(
+  entries: { workflowId: string; hash: string; json: string }[],
+): Promise<void> {
+  if (entries.length === 0) return;
+  await prisma.$transaction(
+    entries.map((e) =>
+      prisma.workflowSnapshot.upsert({
+        where: { workflowId: e.workflowId },
+        create: { workflowId: e.workflowId, hash: e.hash, json: e.json },
+        update: { hash: e.hash, json: e.json },
+      }),
+    ),
+  );
 }
 
 // ---- Slack install ----------------------------------------------------------

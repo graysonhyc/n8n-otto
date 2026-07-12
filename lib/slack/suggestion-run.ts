@@ -3,7 +3,7 @@ import { getAllOwners, getSlackInstall, getSuggestionStates, listSops, setSugges
 import { loadInstance } from "@/lib/data/source";
 import { buildClusters, classifySuggestions } from "@/lib/derive/suggestions";
 import { enrichSuggestions } from "@/lib/data/suggestions";
-import { postBlocks } from "@/lib/slack/post";
+import { masterChannelId, postBlocks } from "@/lib/slack/post";
 import { suggestionBlocks } from "@/lib/slack/blocks";
 import type { Owner } from "@/lib/backoffice/types";
 
@@ -13,9 +13,10 @@ export type SuggestionSweepResult =
 
 /**
  * Resolve where a suggestion should be posted: if every member workflow resolves
- * to the same owner Slack channel, use it; otherwise fall back to the ops channel
- * (SLACK_SUGGESTIONS_CHANNEL). Returns null when neither is available — the
- * suggestion is then skipped rather than posted to the wrong place.
+ * to the same owner Slack channel, use it; otherwise fall back to the dedicated
+ * suggestions channel (SLACK_SUGGESTIONS_CHANNEL), then the catch-all master
+ * channel. Returns null only when none is available — the suggestion is then
+ * skipped rather than posted to the wrong place.
  */
 function resolveChannel(memberIds: string[], owners: Map<string, Owner>): string | null {
   const channels = new Set<string>();
@@ -24,7 +25,7 @@ function resolveChannel(memberIds: string[], owners: Map<string, Owner>): string
     if (ch) channels.add(ch);
   }
   if (channels.size === 1) return [...channels][0];
-  return process.env.SLACK_SUGGESTIONS_CHANNEL ?? null;
+  return process.env.SLACK_SUGGESTIONS_CHANNEL ?? masterChannelId() ?? null;
 }
 
 /**

@@ -9,6 +9,8 @@ export interface NotifyDeps {
   post: (channelId: string, item: BriefItem) => Promise<void>;
   markNotified: (key: string) => Promise<void>;
   clearNotified: (keys: string[]) => Promise<void>;
+  /** Catch-all channel for items whose workflow has no owner channel. */
+  masterChannelId?: string;
 }
 
 // Decide what to post and what to re-arm. Pure over its injected deps: posts any
@@ -28,8 +30,9 @@ export async function notifyNewItems(deps: NotifyDeps): Promise<{ posted: number
     if (deps.notified.has(item.key)) continue;
     const status = deps.states.get(item.key);
     if (status === "dismissed" || status === "acknowledged") continue;
-    const channelId = item.workflowId ? deps.owners.get(item.workflowId)?.slackChannelId : null;
-    if (!channelId) continue; // unowned / no channel → skipped
+    const ownerChannel = item.workflowId ? deps.owners.get(item.workflowId)?.slackChannelId : null;
+    const channelId = ownerChannel ?? deps.masterChannelId;
+    if (!channelId) continue; // no owner channel and no master → skipped
     await deps.post(channelId, item);
     await deps.markNotified(item.key);
     posted++;

@@ -3,6 +3,7 @@ import { blastRadius } from "@/lib/derive/blast";
 import { estateLedger } from "@/lib/derive/ledger";
 import { processStatus } from "@/lib/derive/processStatus";
 import { workflowUrlFromEnv, executionsUrlFromEnv } from "@/lib/n8n/links";
+import type { BriefItem } from "@/lib/brief/build";
 import type { AgentContext } from "./context";
 
 /** Caller→callee pairs from the graph's tier-A call edges. */
@@ -95,6 +96,21 @@ function detailItem(i: RegistryItem) {
   };
 }
 
+function attentionProjection(a: BriefItem, ctx: AgentContext) {
+  const name = a.workflowId ? ctx.items.find((i) => i.id === a.workflowId)?.name ?? null : null;
+  return {
+    severity: a.severity,
+    category: a.category,
+    title: a.title,
+    workflow: name,
+    workflowId: a.workflowId,
+    whatHappened: a.whatHappened,
+    whyItMatters: a.whyItMatters,
+    owner: a.suggestedOwner,
+    recommendedAction: a.recommendedAction,
+  };
+}
+
 function matches(i: RegistryItem, q: string): boolean {
   const hay = [
     i.name,
@@ -175,6 +191,69 @@ const TOOLS: Tool[] = [
     run: (args, ctx) => {
       const windowDays = typeof args.windowDays === "number" ? args.windowDays : 30;
       return estateLedger(ctx.items, ctx.executions, ctx.now, windowDays);
+    },
+  },
+  {
+    name: "get_attention_items",
+    description:
+      "The ranked 'what needs attention now' list — the same items the daily brief surfaces: incidents (repeated failures), unowned critical workflows, ungoverned AI agents with tool access, disconnected/dead steps, and shared-credential risks. Highest-severity first, each with why it matters + a recommended action. Use for 'what needs attention?', 'what did the brief say?', 'what's on fire?', 'anything I should look at?'. Optionally filter by severity.",
+    parameters: {
+      type: "object",
+      properties: {
+        severity: { type: "string", enum: ["high", "medium", "low"], description: "optional: only items at this severity" },
+      },
+    },
+    run: (args, ctx) => {
+      const sev = args.severity ? String(args.severity) : null;
+      const items = ctx.attention.filter((a) => !sev || a.severity === sev);
+      const bySeverity: Record<string, number> = { high: 0, medium: 0, low: 0 };
+      for (const a of ctx.attention) bySeverity[a.severity]++;
+      return {
+        total: ctx.attention.length,
+        bySeverity,
+        count: items.length,
+        items: items.map((a) => attentionProjection(a, ctx)),
+      };
+    },
+  },
+  {
+    name: "list_failures",
+    description:
+      "Recent failed executions rolled up per workflow: failure count, when it last failed, owner, and systems touched — most-failing first. Use for 'what errored this week?', 'show me failures', 'what's been failing?', 'which workflows are broken?'. Note: n8n's API exposes execution status + timing, not the error text — for the stack trace point the user to the executions view via open_in_n8n.",
+    parameters: {
+      type: "object",
+      properties: { sinceDays: { type: "number", description: "window in days (default 7)" } },
+    },
+    run: (args, ctx) => {
+      const sinceDays = typeof args.sinceDays === "number" ? args.sinceDays : 7;
+      const cutoff = ctx.now - sinceDays * 86_400_000;
+      const failed = ctx.executions.filter(
+        (e) => (e.status === "error" || e.status === "crashed") && Date.parse(e.startedAt) >= cutoff,
+      );
+      const byWorkflow = new Map<string, { count: number; last: number }>();
+      for (const e of failed) {
+        const t = Date.parse(e.startedAt);
+        const cur = byWorkflow.get(e.workflowId);
+        if (!cur) byWorkflow.set(e.workflowId, { count: 1, last: t });
+        else {
+          cur.count++;
+          if (t > cur.last) cur.last = t;
+        }
+      }
+      const results = [...byWorkflow.entries()]
+        .map(([id, { count, last }]) => {
+          const item = ctx.items.find((i) => i.id === id);
+          return {
+            id,
+            name: item?.name ?? id,
+            owner: item?.owner?.team ?? null,
+            systems: item?.systems ?? [],
+            failures: count,
+            lastFailureAt: new Date(last).toISOString(),
+          };
+        })
+        .sort((a, b) => b.failures - a.failures);
+      return { sinceDays, totalFailedExecutions: failed.length, workflowsAffected: results.length, results };
     },
   },
   {

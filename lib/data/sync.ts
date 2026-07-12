@@ -1,6 +1,6 @@
 import "server-only";
 import { loadInstance } from "./source";
-import { getSnapshot, putSnapshot } from "@/lib/backoffice/store";
+import { getSnapshot, getAllSnapshots, putSnapshot, putSnapshots } from "@/lib/backoffice/store";
 import {
   diffFields,
   snapshot,
@@ -30,12 +30,15 @@ export async function runSync(): Promise<SyncResult> {
   const { workflows, live } = await loadInstance();
   if (!live) await seedDemoBaseline();
 
+  // One read for every prior snapshot, instead of a findUnique per workflow.
+  const prev = await getAllSnapshots();
   const changes = new Map<string, ChangeEvent[]>();
+  const writes: { workflowId: string; hash: string; json: string }[] = [];
   let changed = 0;
 
   for (const workflow of workflows as N8nWorkflow[]) {
     const snap = snapshot(workflow);
-    const prevRow = await getSnapshot(workflow.id);
+    const prevRow = prev.get(workflow.id);
     if (prevRow && prevRow.hash !== snap.hash) {
       const prevFields = JSON.parse(prevRow.json) as SnapshotFields;
       const events = diffFields(prevFields, snapshotFields(workflow));
@@ -44,8 +47,14 @@ export async function runSync(): Promise<SyncResult> {
         changed++;
       }
     }
-    await putSnapshot(workflow.id, snap.hash, JSON.stringify(snap.fields));
+    // Persist only new or changed snapshots. Re-writing an identical hash was
+    // pure overhead — in steady state nothing changes and no write is issued.
+    if (!prevRow || prevRow.hash !== snap.hash) {
+      writes.push({ workflowId: workflow.id, hash: snap.hash, json: JSON.stringify(snap.fields) });
+    }
   }
+
+  await putSnapshots(writes);
 
   return { changes, scanned: workflows.length, changed };
 }

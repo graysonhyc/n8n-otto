@@ -44,6 +44,24 @@ describe("groupBriefsByChannel", () => {
     expect(briefs.every((b) => b.daily.yesterday !== undefined)).toBe(true);
   });
 
+  it("routes unowned workflows to the master channel when one is given", () => {
+    const ids = allWorkflows.map((w) => w.id);
+    const owners = new Map<string, Owner>([[ids[0], owner(ids[0], "C_A")]]);
+    const items = composeRegistry({ workflows: allWorkflows, executions, owners, now: NOW });
+    const briefs = groupBriefsByChannel({
+      items,
+      executions,
+      changes: new Map(),
+      attention: [],
+      sharedCredentials: [],
+      now: NOW,
+      masterChannelId: "C_MASTER",
+    });
+    const channels = briefs.map((b) => b.channelId).sort();
+    // owned workflow → C_A; every other (unowned) workflow → the master channel
+    expect(channels).toEqual(["C_A", "C_MASTER"]);
+  });
+
   it("scopes yesterday stats to only the channel's workflows", () => {
     const ids = allWorkflows.map((w) => w.id);
     const owners = new Map<string, Owner>([[ids[0], owner(ids[0], "C_ONLY")]]);

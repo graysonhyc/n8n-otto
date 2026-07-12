@@ -9,6 +9,41 @@ export interface ProcessGroup {
   workflowIds: string[]; // sorted
 }
 
+/** A hand-authored SOP (ProcessGroup table) projected for graph merging. */
+export interface AuthoredSop {
+  id: string;
+  name: string;
+  workflowIds: string[];
+}
+
+/**
+ * Merge hand-authored SOPs (the human source of truth) with auto-detected
+ * clusters. Authored SOPs win: any workflow assigned to one is removed from the
+ * derived clusters so a workflow never appears in two "processes". Derived
+ * clusters that fall below two members after trimming are dropped (a process
+ * needs at least two steps); authored SOPs are kept even at one member because a
+ * human explicitly declared them.
+ */
+export function mergeAuthoredGroups(
+  authored: AuthoredSop[],
+  derived: ProcessGroup[],
+): ProcessGroup[] {
+  const authoredGroups: ProcessGroup[] = authored
+    .map((s) => ({
+      key: "sop:" + s.id, // distinct from derived "pg:" keys
+      name: s.name,
+      workflowIds: [...s.workflowIds].sort(),
+    }))
+    .filter((g) => g.workflowIds.length > 0);
+
+  const claimed = new Set(authoredGroups.flatMap((g) => g.workflowIds));
+  const trimmed = derived
+    .map((g) => ({ ...g, workflowIds: g.workflowIds.filter((id) => !claimed.has(id)) }))
+    .filter((g) => g.workflowIds.length >= 2);
+
+  return [...authoredGroups, ...trimmed];
+}
+
 /** Cluster id-pairs into connected components (union-find). */
 export function clusterByPairs(pairs: Array<[string, string]>, names: Map<string, string>): ProcessGroup[] {
   const parent = new Map<string, string>();

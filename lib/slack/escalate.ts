@@ -1,7 +1,7 @@
 import "server-only";
 import { getAllOwners, getBriefStates, getSlackInstall } from "@/lib/backoffice/store";
 import { loadDailyBrief } from "@/lib/data/brief";
-import { postBlocks } from "@/lib/slack/post";
+import { masterChannelId, postBlocks } from "@/lib/slack/post";
 import { briefItemBlocks } from "@/lib/slack/blocks";
 
 export type EscalateResult =
@@ -28,8 +28,8 @@ export async function escalateUnacked(): Promise<EscalateResult> {
   let escalated = 0;
   for (const item of pending) {
     const owner = item.workflowId ? owners.get(item.workflowId) ?? null : null;
-    const channelId = owner?.escalationChannelId ?? owner?.slackChannelId;
-    if (!channelId) continue; // unowned → skipped
+    const channelId = owner?.escalationChannelId ?? owner?.slackChannelId ?? masterChannelId();
+    if (!channelId) continue; // no owner channel and no master → skipped
     await postBlocks(
       install.botToken,
       channelId,
