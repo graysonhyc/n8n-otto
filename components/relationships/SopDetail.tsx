@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { colorFor } from "@/components/map/legend";
@@ -12,6 +12,15 @@ export function SopDetail({ sop, members, addable }: SopDetailView) {
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState(false);
   const [desc, setDesc] = useState(sop.description ?? "");
+  const descRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the textarea to fit its content so no text is clipped.
+  useLayoutEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [desc]);
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -58,11 +67,12 @@ export function SopDetail({ sop, members, addable }: SopDetailView) {
           Description
         </label>
         <textarea
+          ref={descRef}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           placeholder="What is this process? What do these workflows accomplish together?"
           rows={3}
-          className="w-full resize-y rounded-lg border border-line bg-panel-2 px-3 py-2 text-[13px] text-ink placeholder:text-faint focus:border-line-2 focus:outline-none"
+          className="block max-h-[60vh] min-h-[4.5rem] w-full resize-y overflow-y-auto rounded-lg border border-line bg-panel-2 px-3 py-2 text-[13px] leading-relaxed text-ink placeholder:text-faint focus:border-line-2 focus:outline-none"
         />
         {dirty && (
           <div className="mt-2 flex gap-2">
