@@ -17,7 +17,6 @@ type Item = {
 
 function backofficeItems(briefCount?: number): Item[] {
   return [
-    { href: "/overview", label: "Overview", icon: "home" },
     { href: "/brief", label: "Brief", icon: "shield", badge: briefCount || undefined },
     { href: "/registry", label: "Registry", icon: "table" },
     { href: "/map", label: "Relationships", icon: "map" },
@@ -107,7 +106,7 @@ export function SideNav({ n8nBaseUrl, briefCount }: { n8nBaseUrl?: string; brief
 
   return (
     <aside className="flex flex-col gap-0.5 border-r border-line bg-panel px-3 py-3.5">
-      <Link href="/overview" className="mb-2 flex items-center gap-2.5 px-2 py-1" aria-label="n8n Otto — home">
+      <Link href="/brief" className="mb-2 flex items-center gap-2.5 px-2 py-1" aria-label="n8n Otto — home">
         <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-accent shadow-[0_1px_2px_rgba(234,75,113,0.35)]">
           <Icon name="flow" size={15} className="text-white" strokeWidth={2} />
         </span>

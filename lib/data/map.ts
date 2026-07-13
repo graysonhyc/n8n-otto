@@ -4,7 +4,8 @@ import { getAllOwners, getSop, getSuggestionStates, listSops } from "@/lib/backo
 import { buildClusters, classifySuggestions, type SopSuggestion } from "@/lib/derive/suggestions";
 import { enrichSuggestions } from "./suggestions";
 import type { WorkflowGraphNode } from "@/lib/derive/graph";
-import { composeRegistryItem } from "@/lib/derive/registry";
+import { composeRegistry, composeRegistryItem } from "@/lib/derive/registry";
+import { computeBySystem } from "@/lib/derive/overview";
 import type { Sop } from "@/lib/backoffice/types";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner } from "@/lib/backoffice/types";
@@ -39,12 +40,19 @@ export interface GroupsView {
   rows: SopRow[];
   totalWorkflows: number;
   unassignedCount: number;
+  /** Top integrations across all workflows — the breakdown moved off Overview. */
+  bySystem: { label: string; value: number }[];
   live: boolean;
 }
 
 /** The process table (list of SOPs) for `?view=groups`. */
 export async function loadGroups(): Promise<GroupsView> {
-  const [{ workflows, live }, sops] = await Promise.all([loadInstance(), listSops()]);
+  const now = Date.now();
+  const [{ workflows, executions, live }, owners, sops] = await Promise.all([
+    loadInstance(),
+    getAllOwners(),
+    listSops(),
+  ]);
   const rows: SopRow[] = sops.map((s) => ({
     id: s.id,
     name: s.name,
@@ -53,10 +61,12 @@ export async function loadGroups(): Promise<GroupsView> {
     workflowCount: s.members.length,
   }));
   const assignedCount = sops.reduce((n, s) => n + s.members.length, 0);
+  const bySystem = computeBySystem(composeRegistry({ workflows, executions, owners, now }));
   return {
     rows,
     totalWorkflows: workflows.length,
     unassignedCount: workflows.length - assignedCount,
+    bySystem,
     live,
   };
 }

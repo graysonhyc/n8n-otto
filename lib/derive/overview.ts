@@ -38,6 +38,34 @@ function dayKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
+// Workflows grouped by owning team — top 6 by count, Unassigned pinned last.
+// Shared so the Registry page can render the same breakdown Overview used to.
+export function computeByTeam(items: RegistryItem[]): Overview["byTeam"] {
+  const teamCounts = new Map<string, number>();
+  for (const i of items) teamCounts.set(teamOf(i), (teamCounts.get(teamOf(i)) ?? 0) + 1);
+  return [...teamCounts.entries()]
+    .map(([label, value]) => ({
+      label,
+      value,
+      color: label === "Unassigned" ? "var(--color-faint)" : "var(--color-accent)",
+    }))
+    .sort((a, b) =>
+      a.label === "Unassigned" ? 1 : b.label === "Unassigned" ? -1 : b.value - a.value,
+    )
+    .slice(0, 6);
+}
+
+// Integrations ranked by how many workflows touch them — top 6.
+// Shared so the Relationships page can render the same breakdown.
+export function computeBySystem(items: RegistryItem[]): Overview["bySystem"] {
+  const sysCounts = new Map<string, number>();
+  for (const i of items) for (const s of i.systems) sysCounts.set(s, (sysCounts.get(s) ?? 0) + 1);
+  return [...sysCounts.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+}
+
 export function buildOverview(input: {
   items: RegistryItem[];
   executions: N8nExecution[];
@@ -76,27 +104,8 @@ export function buildOverview(input: {
     }
   }
 
-  // teams — top 6 by workflow count, Unassigned always last if present
-  const teamCounts = new Map<string, number>();
-  for (const i of items) teamCounts.set(teamOf(i), (teamCounts.get(teamOf(i)) ?? 0) + 1);
-  const byTeam = [...teamCounts.entries()]
-    .map(([label, value]) => ({
-      label,
-      value,
-      color: label === "Unassigned" ? "var(--color-faint)" : "var(--color-accent)",
-    }))
-    .sort((a, b) =>
-      a.label === "Unassigned" ? 1 : b.label === "Unassigned" ? -1 : b.value - a.value,
-    )
-    .slice(0, 6);
-
-  // integrations — top 6 systems by usage
-  const sysCounts = new Map<string, number>();
-  for (const i of items) for (const s of i.systems) sysCounts.set(s, (sysCounts.get(s) ?? 0) + 1);
-  const bySystem = [...sysCounts.entries()]
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
+  const byTeam = computeByTeam(items);
+  const bySystem = computeBySystem(items);
 
   // type mix
   const typeCounts = new Map<string, number>();

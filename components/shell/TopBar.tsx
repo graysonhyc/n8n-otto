@@ -7,7 +7,6 @@ import { OPEN_EVENT } from "./CommandPalette";
 import { ThemeToggle } from "./ThemeToggle";
 
 function crumb(pathname: string): { root: string; leaf: string } {
-  if (pathname.startsWith("/overview")) return { root: "Otto", leaf: "Overview" };
   if (pathname.startsWith("/registry")) return { root: "Otto", leaf: "Registry" };
   if (pathname.startsWith("/workflow")) return { root: "Registry", leaf: "Workflow" };
   if (pathname.startsWith("/map")) return { root: "Otto", leaf: "Relationships" };

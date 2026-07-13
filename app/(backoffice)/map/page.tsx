@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/shell/AppShell";
 import { Chip } from "@/components/ui/Chip";
 import { ProcessTable } from "@/components/relationships/ProcessTable";
 import { SuggestedProcesses } from "@/components/relationships/SuggestedProcesses";
+import { BreakdownPanel } from "@/components/charts/BreakdownPanel";
 import { loadGroups, loadSuggestions } from "@/lib/data/map";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export default async function RelationshipsPage() {
         }
         actions={<Chip>{groups.live ? "Live instance" : "Demo data"}</Chip>}
       />
+      <BreakdownPanel title="Top integrations" rows={groups.bySystem} className="mb-4" />
       <SuggestedProcesses suggestions={suggestions} />
       <ProcessTable {...groups} />
     </div>

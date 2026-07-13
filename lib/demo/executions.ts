@@ -20,18 +20,32 @@ const HISTORY_DAYS = 10;
 // yesterday recap (which only counts active workflows). The rest are inactive but
 // still get history so the estate's ROI/overview reads as a productive estate.
 const HEALTHY_NAMES = [
-  "Sync Youtube Content Database",
-  "Scrape LinkedIn job listings",
-  "Health Score Sync",
-  "Churn Risk Agent",
+  // Downstream half of the Refund SOP + its Stripe sibling — healthy, so the
+  // incident is isolated to the failing head (below) and the blast radius has
+  // live neighbours to name.
+  "Refund Execution",
   "Dunning Retry",
+  // IT SOP + the rest of the estate — productive history so ROI/overview reads
+  // as a real, busy estate around the one incident.
+  "Access Provisioning",
+  "Employee Offboarding",
+  "Incident Triage Agent",
+  "Churn Risk Agent",
+  "Health Score Sync",
+  "NPS Follow-up",
+  // Original content-sync workflows (active in the live estate).
+  "Sync Youtube Content Database",
+  "Sync Linked Content Database",
+  "Scrape LinkedIn job listings",
   "AI-Powered Invoice Reminder & Payment Tracker for Finance & Accounting",
 ];
 
 // One workflow is made to fail over the last two days (incl. yesterday) so there
-// is a real incident to talk about — the LinkedIn sync in the Content SOP, whose
-// healthy sibling (Sync Youtube) keeps running: a failing head in a live process.
-const FAILING_NAME = "Sync Linked Content Database";
+// is a real incident to anchor the demo on — the HEAD of the Refund SOP. It calls
+// Refund Execution (which issues the Stripe refund), so a failing head means
+// refunds are neither decided nor paid: a high-severity, money-moving incident
+// whose blast radius (SOP + shared Stripe credential) is the story.
+const FAILING_NAME = "Refund Review Agent";
 
 function exec(id: string, startedAtMs: number, status: N8nExecution["status"], durMs: number): N8nExecution {
   return {
