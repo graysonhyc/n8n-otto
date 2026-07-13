@@ -1,11 +1,8 @@
 import type { N8nWorkflow, N8nExecution, WorkflowType } from "@/lib/n8n/types";
 import type { Owner, ManualLink } from "@/lib/backoffice/types";
 import { composeRegistryItem } from "./registry";
-import {
-  workflowCallEdges,
-  sharedCredentialEdges,
-  systemEdges,
-} from "./edges";
+import { systemEdges } from "./edges";
+import { deriveRelationships, type RelationshipKind } from "./relationships";
 import {
   computeProcessGroupsMerged,
   mergeAuthoredGroups,
@@ -58,12 +55,15 @@ export interface GraphEdge {
   kind:
     | "calls"
     | "subworkflow-tool"
+    | "webhook-handoff"
     | "shares-credential"
+    | "shares-datasource"
     | "uses-system"
     | "uses-resource"
     | "uses-credential"
+    | "similar"
     | "manual";
-  tier: "A" | "B" | "M";
+  tier: "A" | "B" | "M" | "S";
   label?: string;
 }
 
@@ -114,23 +114,27 @@ export function composeGraph(input: ComposeGraphInput): WorkflowGraph {
 
   const edges: GraphEdge[] = [];
 
-  // Tier A: workflow → workflow (Execute Workflow). Skip dangling targets.
-  for (const wf of workflows) {
-    for (const e of workflowCallEdges(wf)) {
-      if (!ids.has(e.to)) continue;
-      edges.push({ id: `calls:${e.from}->${e.to}`, source: e.from, target: e.to, kind: "calls", tier: "A" });
-    }
-  }
-
-  // Tier A: shared credential (already one edge per pair).
-  for (const e of sharedCredentialEdges(workflows)) {
+  // Workflow ↔ workflow relationships, from the unified detector so the graph,
+  // dashboard and blast radius all read one source of truth. Each RelationshipKind
+  // maps to a graph edge kind + reliability tier.
+  const REL_TO_GRAPH: Record<RelationshipKind, { kind: GraphEdge["kind"]; tier: GraphEdge["tier"] }> = {
+    "shared-credential": { kind: "shares-credential", tier: "A" },
+    "shared-datasource": { kind: "shares-datasource", tier: "A" },
+    "structural:subworkflow": { kind: "calls", tier: "A" },
+    "structural:subagent": { kind: "subworkflow-tool", tier: "A" },
+    "structural:webhook": { kind: "webhook-handoff", tier: "A" },
+    "semantic-similar": { kind: "similar", tier: "S" },
+  };
+  for (const e of deriveRelationships(workflows).edges) {
+    if (!ids.has(e.from) || !ids.has(e.to)) continue;
+    const m = REL_TO_GRAPH[e.kind];
     edges.push({
-      id: `cred:${e.credentialId}:${e.from}-${e.to}`,
+      id: `${m.kind}:${e.from}->${e.to}`,
       source: e.from,
       target: e.to,
-      kind: "shares-credential",
-      tier: "A",
-      label: e.credentialName,
+      kind: m.kind,
+      tier: m.tier,
+      label: e.label,
     });
   }
 

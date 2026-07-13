@@ -164,7 +164,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_blast_radius",
     description:
-      "What is impacted if a workflow breaks or changes: downstream workflows (by name), systems, its business process, and every owner team that should be notified.",
+      "What is impacted if a workflow breaks or changes. `impacted` = confident dependencies (calls, sub-agents, webhook hand-offs, shared credentials/data sources). `advisory` = lower-confidence links (shares an external system, or a near-duplicate to keep in sync). Also returns systems, the linked-workflow group, and every owner team to notify.",
     parameters: {
       type: "object",
       properties: { id: { type: "string" } },
@@ -177,9 +177,10 @@ const TOOLS: Tool[] = [
       const nameOf = (wid: string) => ctx.items.find((i) => i.id === wid)?.name ?? wid;
       return {
         workflowId: b.workflowId,
-        downstreamWorkflows: b.downstreamWorkflowIds.map((wid) => ({ id: wid, name: nameOf(wid) })),
+        impacted: b.downstreamWorkflowIds.map((wid) => ({ id: wid, name: nameOf(wid) })),
+        advisory: b.advisoryWorkflowIds.map((wid) => ({ id: wid, name: nameOf(wid) })),
         systems: b.systems,
-        processGroup: b.processGroup ? b.processGroup.name : null,
+        linkedGroup: b.processGroup ? b.processGroup.name : null,
         affectedOwnerTeams: b.affectedOwnerTeams,
       };
     },
