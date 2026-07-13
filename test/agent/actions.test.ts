@@ -46,3 +46,42 @@ describe("agentToolset — create_linear_ticket", () => {
     expect(res.name).toBe(ctx.items[0].name);
   });
 });
+
+describe("agentToolset — create_sop_from_thread", () => {
+  const twoIds = [ctx.items[0].id, ctx.items[1].id];
+
+  it("creates the SOP with the given name, description, and valid members", async () => {
+    const createSop = vi.fn().mockResolvedValue({ id: "sop-1", name: "Refund handling", description: "d", updatedAt: "" });
+    const { runTool } = agentToolset(null, { createSop });
+    const res = (await runTool(
+      "create_sop_from_thread",
+      { name: "Refund handling", description: "How refunds flow", memberIds: twoIds },
+      ctx,
+    )) as { created: boolean; sopId: string; linkedWorkflows: string[] };
+    expect(res.created).toBe(true);
+    expect(res.sopId).toBe("sop-1");
+    expect(res.linkedWorkflows).toEqual([ctx.items[0].name, ctx.items[1].name]);
+    expect(createSop).toHaveBeenCalledWith("Refund handling", twoIds, "How refunds flow");
+  });
+
+  it("silently drops unknown workflow ids but still creates from the valid ones", async () => {
+    const createSop = vi.fn().mockResolvedValue({ id: "sop-2", name: "P", description: null, updatedAt: "" });
+    const { runTool } = agentToolset(null, { createSop });
+    const res = (await runTool(
+      "create_sop_from_thread",
+      { name: "P", memberIds: [ctx.items[0].id, "nope-not-real"] },
+      ctx,
+    )) as { created: boolean; skippedUnknownIds: string[] };
+    expect(res.created).toBe(true);
+    expect(createSop).toHaveBeenCalledWith("P", [ctx.items[0].id], null);
+    expect(res.skippedUnknownIds).toEqual(["nope-not-real"]);
+  });
+
+  it("refuses to create an SOP with no name", async () => {
+    const createSop = vi.fn();
+    const { runTool } = agentToolset(null, { createSop });
+    const res = (await runTool("create_sop_from_thread", { name: "  ", memberIds: twoIds }, ctx)) as { error: string };
+    expect(res.error).toMatch(/name/i);
+    expect(createSop).not.toHaveBeenCalled();
+  });
+});

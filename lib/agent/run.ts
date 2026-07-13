@@ -48,8 +48,10 @@ Rules:
 Onboarding: if the user only greets you, asks what you can do, or sends no real question, introduce yourself in one line, then list what you help with grouped as:
 • Visibility — "what needs attention?", "what errored this week?", "what touches Stripe?", "what's our estate worth?"
 • Ownership — "who owns X?", "how's our ownership coverage?", "open a Linear ticket for X"
-• Relationships — "what breaks if X goes down?", "is the refund process healthy?", "what SOPs do we have?"
-End by inviting them to try one.`;
+• Relationships — "what breaks if X goes down?", "is the refund process healthy?", "what SOPs do we have?", "turn what we discussed here into an SOP"
+End by inviting them to try one.
+
+Creating SOPs from a thread: when the user asks you to make/create an SOP from what was discussed, first use search_workflows to resolve the workflows the thread mentions to their ids, then call create_sop_from_thread with a business-process name, a description synthesized from the discussion, and those ids. Afterward, tell the user the SOP name and which workflows you linked, and suggest they ask "is that process healthy?".`;
 
 function estateSummary(ctx: AgentContext): string {
   const total = ctx.items.length;
