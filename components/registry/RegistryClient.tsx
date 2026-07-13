@@ -5,51 +5,15 @@ import Link from "next/link";
 import type { RegistryItem } from "@/lib/derive/registry";
 import type { WorkflowType } from "@/lib/n8n/types";
 import { Pill } from "@/components/ui/Pill";
-import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/Icon";
-import {
-  TYPE_LABEL,
-  criticalityTone,
-  relativeTime,
-  riskTone,
-  typeTone,
-} from "@/lib/format";
+import { TYPE_LABEL, relativeTime, typeTone } from "@/lib/format";
 import { OwnerAssign } from "./OwnerAssign";
 
 // Sentinel select value meaning "no owner assigned" (distinct from "All").
 const UNASSIGNED = "__unassigned__";
 
-type FilterKey =
-  | "uses-ai"
-  | "tool-access"
-  | "no-owner"
-  | "customer-facing"
-  | "recently-changed"
-  | "stale"
-  | "prod-critical";
-
-const FILTERS: { key: FilterKey; label: string; test: (i: RegistryItem) => boolean }[] = [
-  { key: "uses-ai", label: "Uses AI", test: (i) => i.usesAI },
-  { key: "tool-access", label: "Has tool access", test: (i) => i.hasToolAccess },
-  { key: "no-owner", label: "No channel", test: (i) => !i.owner },
-  { key: "customer-facing", label: "Customer-facing", test: (i) => i.criticality === "High" },
-  {
-    key: "recently-changed",
-    label: "Recently changed",
-    test: (i) => !!i.lastChange && Date.now() - new Date(i.lastChange).getTime() < 7 * 86400000,
-  },
-  {
-    key: "stale",
-    label: "Stale",
-    test: (i) => !!i.lastChange && Date.now() - new Date(i.lastChange).getTime() > 60 * 86400000,
-  },
-  { key: "prod-critical", label: "Prod-critical", test: (i) => i.active && i.criticality === "High" },
-];
-
 // Sortable columns and how each row maps to a comparable value.
-type SortKey = "name" | "type" | "owner" | "criticality" | "lastChange" | "risk";
-const CRIT_RANK = { High: 0, Medium: 1, Low: 2 } as const;
-const RISK_RANK = { high: 0, medium: 1, low: 2 } as const;
+type SortKey = "name" | "type" | "owner" | "lastChange";
 
 function sortValue(i: RegistryItem, key: SortKey): string | number {
   switch (key) {
@@ -57,12 +21,8 @@ function sortValue(i: RegistryItem, key: SortKey): string | number {
       return TYPE_LABEL[i.type];
     case "owner":
       return (i.owner?.slackChannelName ?? i.owner?.team)?.toLowerCase() ?? "~"; // unassigned sorts last
-    case "criticality":
-      return CRIT_RANK[i.criticality];
     case "lastChange":
       return i.lastChange ? new Date(i.lastChange).getTime() : 0;
-    case "risk":
-      return RISK_RANK[i.risk.level];
     default:
       return i.name.toLowerCase();
   }
@@ -72,18 +32,14 @@ const COLUMNS: { label: string; sort?: SortKey }[] = [
   { label: "Name", sort: "name" },
   { label: "Type", sort: "type" },
   { label: "Channel", sort: "owner" },
-  { label: "Crit.", sort: "criticality" },
-  { label: "AI" },
   { label: "Systems" },
   { label: "Last change", sort: "lastChange" },
-  { label: "Risk", sort: "risk" },
 ];
 
 export function RegistryClient({ items }: { items: RegistryItem[] }) {
-  const [active, setActive] = useState<Set<FilterKey>>(new Set());
   const [channel, setChannel] = useState("");
   const [type, setType] = useState<WorkflowType | "">("");
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "risk", dir: 1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "lastChange", dir: -1 });
 
   const channels = useMemo(
     () =>
@@ -95,10 +51,8 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
   const types = useMemo(() => Array.from(new Set(items.map((i) => i.type))), [items]);
 
   const rows = useMemo(() => {
-    const tests = FILTERS.filter((f) => active.has(f.key)).map((f) => f.test);
     const filtered = items.filter(
       (i) =>
-        tests.every((t) => t(i)) &&
         (channel === "" ||
           (channel === UNASSIGNED ? !i.owner : i.owner?.slackChannelName === channel)) &&
         (type === "" || i.type === type),
@@ -108,23 +62,14 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
       const y = sortValue(b, sort.key);
       return (x < y ? -1 : x > y ? 1 : 0) * sort.dir;
     });
-  }, [items, active, channel, type, sort]);
-
-  function toggle(key: FilterKey) {
-    setActive((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  }
+  }, [items, channel, type, sort]);
 
   function toggleSort(key: SortKey) {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
   }
 
-  const hasFilters = active.size > 0 || channel !== "" || type !== "";
+  const hasFilters = channel !== "" || type !== "";
   function reset() {
-    setActive(new Set());
     setChannel("");
     setType("");
   }
@@ -134,7 +79,7 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
 
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3.5 flex flex-wrap items-center gap-2">
         <select aria-label="Filter by channel" value={channel} onChange={(e) => setChannel(e.target.value)} className={selectClass}>
           <option value="">All channels</option>
           <option value={UNASSIGNED}>Unassigned</option>
@@ -162,25 +107,6 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
             Clear all
           </button>
         )}
-      </div>
-
-      <div className="mb-3.5 flex flex-wrap gap-2">
-        {FILTERS.map((f) => {
-          const on = active.has(f.key);
-          return (
-            <button
-              key={f.key}
-              onClick={() => toggle(f.key)}
-              className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${
-                on
-                  ? "border-accent-line bg-accent-dim text-accent-strong"
-                  : "border-line-2 bg-panel-2 text-muted hover:border-line-2 hover:bg-panel-3 hover:text-ink"
-              }`}
-            >
-              {f.label}
-            </button>
-          );
-        })}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-panel-2">
@@ -224,28 +150,11 @@ export function RegistryClient({ items }: { items: RegistryItem[] }) {
                   <td className="px-3 py-2.5">
                     <OwnerAssign item={i} />
                   </td>
-                  <td className="px-3 py-2.5">
-                    <Pill tone={criticalityTone(i.criticality)} dot={false}>
-                      {i.criticality}
-                    </Pill>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {i.hasToolAccess ? (
-                      <Chip tone="ai">tools</Chip>
-                    ) : i.usesAI ? (
-                      <Chip tone="ai">AI</Chip>
-                    ) : (
-                      <span className="text-faint">—</span>
-                    )}
-                  </td>
                   <td className="px-3 py-2.5 text-[11.5px] text-muted">
                     {i.systems.join(", ") || "—"}
                   </td>
                   <td className="px-3 py-2.5 font-mono text-[11.5px] text-muted nums">
                     {relativeTime(i.lastChange)}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Pill tone={riskTone(i.risk)}>{i.risk.label}</Pill>
                   </td>
                 </tr>
               ))}

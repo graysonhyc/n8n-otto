@@ -106,8 +106,8 @@ export function HBars({
   return (
     <div className="flex flex-col gap-2.5">
       {rows.map((r) => (
-        <div key={r.label} className="grid grid-cols-[104px_1fr_auto] items-center gap-3">
-          <span className="truncate text-[12.5px] text-muted" title={r.label}>
+        <div key={r.label} className="grid grid-cols-[128px_1fr_auto] items-center gap-3">
+          <span className="text-[12.5px] leading-tight break-words text-muted" title={r.label}>
             {r.label}
           </span>
           <span className="h-2 overflow-hidden rounded-full bg-panel-3">
