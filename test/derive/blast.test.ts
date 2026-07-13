@@ -69,7 +69,35 @@ describe("blastRadius", () => {
   it("is empty for an isolated workflow", () => {
     const r = blastRadius("c", graph);
     expect(r.downstreamWorkflowIds).toEqual([]);
+    expect(r.advisoryWorkflowIds).toEqual([]);
     expect(r.systems).toEqual([]);
     expect(r.processGroup).toBeNull();
+  });
+
+  it("puts same-system peers in advisory, not impact", () => {
+    const withPeer: WorkflowGraph = {
+      ...graph,
+      edges: [
+        ...graph.edges,
+        // c also uses Stripe but has no dependency edge to a → advisory only.
+        { id: "uses:c->system:Stripe", source: "c", target: "system:Stripe", kind: "uses-system", tier: "B" },
+      ],
+    };
+    const r = blastRadius("a", withPeer);
+    expect(r.downstreamWorkflowIds).toContain("b"); // exact dep
+    expect(r.downstreamWorkflowIds).not.toContain("c");
+    expect(r.advisoryWorkflowIds).toEqual(["c"]); // same-system only
+  });
+
+  it("puts semantically-similar workflows in advisory", () => {
+    const withSimilar: WorkflowGraph = {
+      ...graph,
+      edges: [
+        ...graph.edges,
+        { id: "similar:a-c", source: "a", target: "c", kind: "similar", tier: "S", label: "0.9" },
+      ],
+    };
+    const r = blastRadius("a", withSimilar);
+    expect(r.advisoryWorkflowIds).toContain("c");
   });
 });

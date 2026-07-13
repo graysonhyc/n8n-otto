@@ -64,9 +64,11 @@ function summariseItem(i: RegistryItem) {
   return {
     id: i.id,
     name: i.name,
-    type: i.type,
+    type: i.type, // deterministic = no AI, ai-assisted = LLM step, ai-agent-tools = AI agent w/ tools
     active: i.active,
     criticality: i.criticality,
+    usesAI: i.usesAI,
+    hasToolAccess: i.hasToolAccess,
     systems: i.systems,
     owner: i.owner?.team ?? null,
     recentFailures: i.health.recentFailures,
@@ -78,10 +80,12 @@ function detailItem(i: RegistryItem) {
   return {
     id: i.id,
     name: i.name,
-    type: i.type,
+    type: i.type, // deterministic = no AI, ai-assisted = LLM step, ai-agent-tools = AI agent w/ tools
     active: i.active,
     criticality: i.criticality,
     trigger: i.trigger,
+    usesAI: i.usesAI,
+    hasToolAccess: i.hasToolAccess,
     model: i.model,
     systems: i.systems,
     tools: i.toolNames,
@@ -130,7 +134,7 @@ const TOOLS: Tool[] = [
   {
     name: "search_workflows",
     description:
-      "Find workflows by free-text over name, system, tool, type, trigger, tag, or owning team. Use for 'what touches Stripe?', 'which agents can issue refunds?', 'what does RevOps own?'.",
+      "Find workflows by free-text over name, system, tool, type, trigger, tag, or owning team. Use for 'what touches Stripe?', 'which agents can issue refunds?', 'what does RevOps own?'. Each result carries usesAI + hasToolAccess + type, so this also answers 'is there any AI in workflow X?' — deterministic type / usesAI:false means no AI; ai-assisted means an LLM step; ai-agent-tools means an AI agent with tool access.",
     parameters: {
       type: "object",
       properties: { query: { type: "string", description: "search terms" } },
@@ -145,7 +149,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_workflow_detail",
     description:
-      "Full business-readable detail for one workflow id: type, owner, systems, tools, health, risk, last change, time saved.",
+      "Full business-readable detail for one workflow id: type, whether it uses AI (usesAI) and whether an AI agent has tool access (hasToolAccess), the model, owner, systems, tools, health, risk, last change, time saved. Answers 'does workflow X use AI / which model / what tools can it call?'.",
     parameters: {
       type: "object",
       properties: { id: { type: "string" } },
@@ -160,7 +164,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_blast_radius",
     description:
-      "What is impacted if a workflow breaks or changes: downstream workflows (by name), systems, its business process, and every owner team that should be notified.",
+      "What is impacted if a workflow breaks or changes. `impacted` = confident dependencies (calls, sub-agents, webhook hand-offs, shared credentials/data sources). `advisory` = lower-confidence links (shares an external system, or a near-duplicate to keep in sync). Also returns systems, the linked-workflow group, and every owner team to notify.",
     parameters: {
       type: "object",
       properties: { id: { type: "string" } },
@@ -173,9 +177,10 @@ const TOOLS: Tool[] = [
       const nameOf = (wid: string) => ctx.items.find((i) => i.id === wid)?.name ?? wid;
       return {
         workflowId: b.workflowId,
-        downstreamWorkflows: b.downstreamWorkflowIds.map((wid) => ({ id: wid, name: nameOf(wid) })),
+        impacted: b.downstreamWorkflowIds.map((wid) => ({ id: wid, name: nameOf(wid) })),
+        advisory: b.advisoryWorkflowIds.map((wid) => ({ id: wid, name: nameOf(wid) })),
         systems: b.systems,
-        processGroup: b.processGroup ? b.processGroup.name : null,
+        linkedGroup: b.processGroup ? b.processGroup.name : null,
         affectedOwnerTeams: b.affectedOwnerTeams,
       };
     },
@@ -324,7 +329,7 @@ const TOOLS: Tool[] = [
   {
     name: "list_processes",
     description:
-      "List the business processes (chains of related workflows, auto-detected from call chains + manual links) with their end-to-end health. Use for 'what processes do we have?', 'which processes are broken?'.",
+      "List groups of linked workflows (chains of related workflows, auto-detected from call chains + manual links) with their end-to-end health. Linked does not imply a formal SOP — it means the workflows depend on each other. Use for 'what workflows are linked?', 'which linked groups are broken?'.",
     parameters: { type: "object", properties: {} },
     run: (_args, ctx) => {
       const pairs = callPairsOf(ctx);
@@ -338,10 +343,10 @@ const TOOLS: Tool[] = [
   {
     name: "process_status",
     description:
-      "End-to-end status of one business process: its ordered steps, health (healthy/degraded/stalled), where it's stalled, and the owner teams. Match by process name or by any member workflow name/id. Use for 'is the refund process healthy?', 'what's blocking the onboarding process?'.",
+      "End-to-end status of one group of linked workflows: its ordered steps, health (healthy/degraded/stalled), where it's stalled, and the owner teams. Match by group name or by any member workflow name/id. Use for 'are the refund workflows healthy?', 'what's blocking the onboarding chain?'.",
     parameters: {
       type: "object",
-      properties: { query: { type: "string", description: "process name or a member workflow name/id" } },
+      properties: { query: { type: "string", description: "linked-group name or a member workflow name/id" } },
       required: ["query"],
     },
     run: (args, ctx) => {
@@ -436,6 +441,68 @@ const TOOLS: Tool[] = [
           rotationRisk: set.size >= 3 ? "high" : set.size === 2 ? "medium" : "low",
         }));
       return { count: results.length, results };
+    },
+  },
+  {
+    name: "get_connections",
+    description:
+      "How one workflow is connected to others, broken down by relationship type: sub-workflow calls, agent sub-workflows, webhook hand-offs, shared credentials, shared data sources, and workflows that merely share an external system. Use for 'what does X connect to?', 'what is X linked to?', 'how are these related?'. For overall break impact use get_blast_radius instead.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", description: "workflow id" } },
+      required: ["id"],
+    },
+    run: (args, ctx) => {
+      const id = String(args.id ?? "");
+      if (!ctx.items.some((i) => i.id === id)) return { error: `No workflow with id ${id}` };
+      const nameOf = (wid: string) => ctx.items.find((i) => i.id === wid)?.name ?? wid;
+      const KIND_LABEL: Record<string, string> = {
+        calls: "sub-workflow call",
+        "subworkflow-tool": "agent sub-workflow",
+        "webhook-handoff": "webhook hand-off",
+        "shares-credential": "shared credential",
+        "shares-datasource": "shared data source",
+        "uses-system": "same system",
+        similar: "similar workflow",
+      };
+      const byKind: Record<string, { workflow: string; via?: string }[]> = {};
+      for (const e of ctx.graph.edges) {
+        const label = KIND_LABEL[e.kind];
+        if (!label) continue;
+        let other: string | null = null;
+        if (e.kind === "uses-system") {
+          // workflow → system node; find peers on the same system separately below.
+          continue;
+        }
+        if (e.source === id) other = e.target;
+        else if (e.target === id) other = e.source;
+        if (!other || !ctx.items.some((i) => i.id === other)) continue;
+        (byKind[label] ??= []).push({ workflow: nameOf(other), via: e.label });
+      }
+      return { workflow: nameOf(id), connections: byKind };
+    },
+  },
+  {
+    name: "get_similar_workflows",
+    description:
+      "Possible duplicate / near-identical workflows, detected by semantic similarity of their purpose (name, description, integrations, prompts). Use for 'do we have duplicate agents?', 'is anything similar to X?', 'where are we doing the same job twice?'. Pass a workflow id to scope to one; omit for the whole estate. Scores are 0-1 (higher = more alike).",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", description: "optional: scope to one workflow id" } },
+    },
+    run: (args, ctx) => {
+      const id = args.id ? String(args.id) : null;
+      const nameOf = (wid: string) => ctx.items.find((i) => i.id === wid)?.name ?? wid;
+      const pairs = ctx.graph.edges
+        .filter((e) => e.kind === "similar")
+        .filter((e) => !id || e.source === id || e.target === id)
+        .map((e) => ({
+          a: nameOf(e.source),
+          b: nameOf(e.target),
+          score: Number(e.label ?? 0),
+        }))
+        .sort((x, y) => y.score - x.score);
+      return { count: pairs.length, possibleDuplicates: pairs };
     },
   },
   {

@@ -91,6 +91,38 @@ export async function removeLink(id: string): Promise<void> {
   await prisma.workflowLink.delete({ where: { id } });
 }
 
+// ---- Workflow embeddings (semantic duplicate detection) --------------------
+
+export interface StoredEmbedding {
+  versionId: string;
+  model: string;
+  vector: number[];
+}
+
+export async function getEmbeddings(): Promise<Map<string, StoredEmbedding>> {
+  const rows = await prisma.workflowEmbedding.findMany();
+  return new Map(
+    rows.map((r) => [
+      r.workflowId,
+      { versionId: r.versionId, model: r.model, vector: r.vector as number[] },
+    ]),
+  );
+}
+
+export async function upsertEmbedding(input: {
+  workflowId: string;
+  versionId: string;
+  model: string;
+  vector: number[];
+}): Promise<void> {
+  const { workflowId, versionId, model, vector } = input;
+  await prisma.workflowEmbedding.upsert({
+    where: { workflowId },
+    create: { workflowId, versionId, model, vector },
+    update: { versionId, model, vector },
+  });
+}
+
 // ---- Snapshots (change detection) ------------------------------------------
 
 export async function getSnapshot(

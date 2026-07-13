@@ -1,4 +1,5 @@
 import type { N8nWorkflow } from "@/lib/n8n/types";
+import { integrationForNode } from "./integrations";
 
 // Relationship edges, tagged by reliability tier:
 //   A = exact (from workflow structure), B/C = heuristic (shown as "possible").
@@ -37,10 +38,6 @@ export interface SystemEdge {
 const AGENT_TYPE = "@n8n/n8n-nodes-langchain.agent";
 const EXECUTE_WORKFLOW_TYPE = "n8n-nodes-base.executeWorkflow";
 const TOOL_WORKFLOW_TYPE = "@n8n/n8n-nodes-langchain.toolWorkflow";
-
-function baseName(type: string): string {
-  return type.split(".").pop() ?? type;
-}
 
 /** Extract the referenced workflow id from an Execute Workflow node's parameters. */
 function referencedWorkflowId(params: Record<string, unknown> | undefined): string | null {
@@ -126,6 +123,62 @@ export function subworkflowToolEdges(workflow: N8nWorkflow): SubworkflowToolEdge
   return edges;
 }
 
+const WEBHOOK_TRIGGER_TYPES = new Set([
+  "n8n-nodes-base.webhook",
+  "n8n-nodes-base.formTrigger",
+]);
+const HTTP_REQUEST_TYPE = "n8n-nodes-base.httpRequest";
+
+export interface WebhookHandoffEdge {
+  from: string; // caller workflow id (makes the HTTP request)
+  to: string; // callee workflow id (owns the webhook the request hits)
+  kind: "webhook-handoff";
+  tier: "A";
+}
+
+/**
+ * Runtime hand-offs invisible in the static graph: workflow A makes an HTTP
+ * request whose URL hits workflow B's webhook/form trigger path. A real
+ * dependency (A drives B) with no Execute-Workflow edge. Deterministic: exact
+ * containment of the trigger path segment in the request URL. Self-hits (a
+ * workflow calling its own trigger) are skipped.
+ */
+export function webhookHandoffEdges(workflows: N8nWorkflow[]): WebhookHandoffEdge[] {
+  // callee id → its non-empty trigger paths.
+  const triggerPaths = new Map<string, string[]>();
+  for (const wf of workflows) {
+    const paths: string[] = [];
+    for (const node of wf.nodes) {
+      if (!WEBHOOK_TRIGGER_TYPES.has(node.type)) continue;
+      const p = node.parameters?.path;
+      if (typeof p === "string" && p.length > 0) paths.push(p);
+    }
+    if (paths.length) triggerPaths.set(wf.id, paths);
+  }
+
+  const edges: WebhookHandoffEdge[] = [];
+  const seen = new Set<string>();
+  for (const wf of workflows) {
+    const urls: string[] = [];
+    for (const node of wf.nodes) {
+      if (node.type !== HTTP_REQUEST_TYPE) continue;
+      const u = resolveResource(node.parameters?.url);
+      if (u) urls.push(u);
+    }
+    if (!urls.length) continue;
+    for (const [calleeId, paths] of triggerPaths) {
+      if (calleeId === wf.id) continue; // don't link a workflow to its own trigger
+      const hit = paths.some((p) => urls.some((u) => u.includes(`/${p}`)));
+      const key = `${wf.id}->${calleeId}`;
+      if (hit && !seen.has(key)) {
+        seen.add(key);
+        edges.push({ from: wf.id, to: calleeId, kind: "webhook-handoff", tier: "A" });
+      }
+    }
+  }
+  return edges;
+}
+
 /** Credential id → list of workflow ids that use it. */
 function credentialUsage(workflows: N8nWorkflow[]): Map<string, { name: string; ids: Set<string> }> {
   const usage = new Map<string, { name: string; ids: Set<string> }>();
@@ -180,20 +233,6 @@ export function sharedCredentialEdges(workflows: N8nWorkflow[]): SharedCredentia
   return edges;
 }
 
-const SYSTEM_BY_NODE: Record<string, string> = {
-  slack: "Slack",
-  hubspot: "HubSpot",
-  salesforce: "Salesforce",
-  stripe: "Stripe",
-  stripeTrigger: "Stripe",
-  zendesk: "Zendesk",
-  gmail: "Gmail",
-  googleBigQuery: "BigQuery",
-  googleSheets: "Google Sheets",
-  postgres: "Postgres",
-  notion: "Notion",
-};
-
 /** Resource identifier within a system, when the node params reveal one. */
 // A resource param is either a plain string or an n8n resource-locator object
 // ({ __rl: true, value, mode }). Unwrap the latter to its id, like
@@ -207,7 +246,7 @@ function resolveResource(v: unknown): string | null {
   return null;
 }
 
-const RESOURCE_KEYS = ["channel", "channelId", "table", "sheetId", "documentId"];
+const RESOURCE_KEYS = ["channel", "channelId", "table", "sheetId", "documentId", "folderId"];
 
 function resourceKey(params: Record<string, unknown> | undefined): string | null {
   if (!params) return null;
@@ -235,9 +274,7 @@ function resourceDisplayName(params: Record<string, unknown> | undefined): strin
 export function systemEdges(workflow: N8nWorkflow): SystemEdge[] {
   const edges: SystemEdge[] = [];
   for (const node of workflow.nodes) {
-    const base = baseName(node.type);
-    const normalized = base.endsWith("Tool") ? base.slice(0, -4) : base;
-    const system = SYSTEM_BY_NODE[normalized];
+    const system = integrationForNode(node);
     if (!system) continue;
     edges.push({
       workflowId: workflow.id,
@@ -268,9 +305,7 @@ export function sharedDataSourceGroups(workflows: N8nWorkflow[]): DataSourceGrou
   const byRes = new Map<string, { system: string; resource: string; name: string | null; ids: Set<string> }>();
   for (const wf of workflows) {
     for (const node of wf.nodes) {
-      const base = baseName(node.type);
-      const normalized = base.endsWith("Tool") ? base.slice(0, -4) : base;
-      const system = SYSTEM_BY_NODE[normalized];
+      const system = integrationForNode(node);
       const resource = resourceKey(node.parameters);
       if (!system || !resource) continue;
       const key = `res:${system}:${resource}`;

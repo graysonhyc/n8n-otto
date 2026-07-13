@@ -1,6 +1,7 @@
 import "server-only";
 import { loadInstance } from "@/lib/data/source";
 import { getAllOwners, getAllLinks, listSops } from "@/lib/backoffice/store";
+import { computeSimilarPairs } from "@/lib/data/duplicates";
 import { composeAgentContext, type AgentContext } from "./context";
 
 // I/O wrapper: pull the instance + stored owners/links/SOPs once, then hand off
@@ -20,5 +21,8 @@ export async function buildAgentContext(): Promise<AgentContext> {
     name: s.name,
     workflowIds: s.members.map((m) => m.workflowId),
   }));
-  return composeAgentContext({ workflows, executions, owners, links, groupNames, now: Date.now(), live, sops });
+  // Semantic-similar pairs (cached embeddings) so Otto can answer "do we have
+  // duplicate agents?" and blast radius can flag near-duplicates as advisory.
+  const similar = await computeSimilarPairs(workflows);
+  return composeAgentContext({ workflows, executions, owners, links, groupNames, now: Date.now(), live, sops, similar });
 }

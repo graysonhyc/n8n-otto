@@ -80,7 +80,7 @@ export function clusterByPairs(pairs: Array<[string, string]>, names: Map<string
     .map((set) => {
       const workflowIds = [...set].sort();
       const key = "pg:" + workflowIds.join("|");
-      return { key, workflowIds, name: names.get(key) ?? "Business process" };
+      return { key, workflowIds, name: names.get(key) ?? "Linked workflows" };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
 }
@@ -96,16 +96,34 @@ export function computeProcessGroups(links: ManualLink[], names: Map<string, str
   return clusterByPairs(pairs, names);
 }
 
-/** Ordered (caller → callee) pairs from tier-A Execute-Workflow call edges. */
+// A callee reached by at least this many DISTINCT callers is treated as shared
+// infrastructure (a utility called all over the estate), not a step in a linked
+// process. Including it would union every unrelated caller into one bogus group.
+const UTILITY_FANIN = 3;
+
+/**
+ * Ordered (caller → callee) pairs from tier-A Execute-Workflow call edges,
+ * excluding calls into shared-utility workflows (fan-in ≥ UTILITY_FANIN). A
+ * linked-workflow group is a real hand-off chain, not "everything that happens
+ * to call the Send-Slack util".
+ */
 export function callProcessPairs(workflows: N8nWorkflow[]): Array<[string, string]> {
   const ids = new Set(workflows.map((w) => w.id));
-  const pairs: Array<[string, string]> = [];
+
+  const rawPairs: Array<[string, string]> = [];
   for (const wf of workflows) {
     for (const e of workflowCallEdges(wf)) {
-      if (ids.has(e.to)) pairs.push([e.from, e.to]);
+      if (ids.has(e.to)) rawPairs.push([e.from, e.to]);
     }
   }
-  return pairs;
+
+  // Distinct callers per callee → drop callees that are shared utilities.
+  const callersByCallee = new Map<string, Set<string>>();
+  for (const [from, to] of rawPairs) {
+    (callersByCallee.get(to) ?? callersByCallee.set(to, new Set()).get(to)!).add(from);
+  }
+
+  return rawPairs.filter(([, to]) => (callersByCallee.get(to)?.size ?? 0) < UTILITY_FANIN);
 }
 
 /**

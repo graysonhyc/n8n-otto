@@ -1,12 +1,15 @@
 import "server-only";
 import { loadInstance } from "./source";
-import { getAllOwners, getSop, getSuggestionStates, listSops } from "@/lib/backoffice/store";
+import { getAllLinks, getAllOwners, getSop, getSuggestionStates, listSops } from "@/lib/backoffice/store";
 import { buildClusters, classifySuggestions, type SopSuggestion } from "@/lib/derive/suggestions";
 import { enrichSuggestions } from "./suggestions";
 import type { WorkflowGraphNode } from "@/lib/derive/graph";
 import { composeRegistry, composeRegistryItem } from "@/lib/derive/registry";
 import { computeBySystem } from "@/lib/derive/overview";
-import type { Sop } from "@/lib/backoffice/types";
+import { deriveRelationships, type RelationshipSummary } from "@/lib/derive/relationships";
+import { workflowIntegrations } from "@/lib/derive/integrations";
+import { computeSimilarPairs } from "./duplicates";
+import type { LinkRelation, Sop } from "@/lib/backoffice/types";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner } from "@/lib/backoffice/types";
 
@@ -69,6 +72,83 @@ export async function loadGroups(): Promise<GroupsView> {
     bySystem,
     live,
   };
+}
+
+/** An integration shared across ≥2 workflows — the coupling/blast surface. */
+export interface SharedIntegrationRow {
+  integration: string;
+  workflowCount: number;
+  workflowNames: string[];
+}
+
+/** One manually-linked pair for the relationships table. */
+export interface ManualLinkRow {
+  id: string;
+  fromName: string;
+  toName: string;
+  relation: LinkRelation;
+  source: string;
+}
+
+/** A possible-duplicate pair for the relationships table. */
+export interface DuplicateRow {
+  aName: string;
+  bName: string;
+  score: number;
+}
+
+export interface RelationshipsView {
+  summary: RelationshipSummary;
+  sharedIntegrations: SharedIntegrationRow[];
+  manualLinks: ManualLinkRow[];
+  duplicates: DuplicateRow[];
+  live: boolean;
+}
+
+/**
+ * Estate-wide relationship dashboard data: the four-signal summary, the
+ * integrations shared by ≥2 workflows (blast surface), and the human-authored
+ * links. Rendered as summary + tables (an estate graph does not scale).
+ */
+export async function loadRelationshipsView(): Promise<RelationshipsView> {
+  const [{ workflows, live }, links] = await Promise.all([loadInstance(), getAllLinks()]);
+  const similar = await computeSimilarPairs(workflows);
+  const nameById = new Map(workflows.map((w) => [w.id, w.name]));
+
+  const { summary } = deriveRelationships(workflows);
+  summary.duplicateCount = similar.length;
+
+  const duplicates: DuplicateRow[] = similar.map((p) => ({
+    aName: nameById.get(p.a) ?? p.a,
+    bName: nameById.get(p.b) ?? p.b,
+    score: p.score,
+  }));
+
+  // integration → workflows that use it (incl. sub-nodes), ≥2 = shared.
+  const users = new Map<string, string[]>();
+  for (const wf of workflows) {
+    for (const integ of workflowIntegrations(wf)) {
+      (users.get(integ) ?? users.set(integ, []).get(integ)!).push(wf.name);
+    }
+  }
+  const sharedIntegrations: SharedIntegrationRow[] = [...users.entries()]
+    .filter(([, names]) => names.length >= 2)
+    .map(([integration, workflowNames]) => ({
+      integration,
+      workflowCount: workflowNames.length,
+      workflowNames: workflowNames.sort(),
+    }))
+    .sort((a, b) => b.workflowCount - a.workflowCount || a.integration.localeCompare(b.integration));
+
+  const manualLinks: ManualLinkRow[] = links.map((l) => ({
+    id: l.id,
+    fromName: nameById.get(l.fromId) ?? l.fromId,
+    toName: nameById.get(l.toId) ?? l.toId,
+    relation: l.relation,
+    source: l.source,
+  }));
+
+  return { summary, sharedIntegrations, manualLinks, duplicates, live };
 }
 
 export interface SuggestionsView {

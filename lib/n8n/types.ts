@@ -34,6 +34,10 @@ export interface N8nWorkflow {
   id: string;
   name: string;
   active: boolean;
+  // Workflow description (returned by the n8n API; used for semantic similarity).
+  description?: string | null;
+  // n8n version id — changes when the workflow is edited; used to cache embeddings.
+  versionId?: string;
   // n8n workflow archiving — archived workflows are hidden from the dashboard.
   isArchived?: boolean;
   nodes: N8nNode[];
