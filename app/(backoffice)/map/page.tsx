@@ -16,8 +16,8 @@ export default async function RelationshipsPage() {
         title="Relationships"
         subtitle={
           <>
-            <b className="font-semibold text-ink nums">{groups.rows.length}</b> process
-            {groups.rows.length === 1 ? "" : "es"} ·{" "}
+            <b className="font-semibold text-ink nums">{groups.rows.length}</b> linked group
+            {groups.rows.length === 1 ? "" : "s"} ·{" "}
             <b className="font-semibold text-ink nums">{groups.unassignedCount}</b> of{" "}
             <b className="font-semibold text-ink nums">{groups.totalWorkflows}</b> workflows unassigned
           </>

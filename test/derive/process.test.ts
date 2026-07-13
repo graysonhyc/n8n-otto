@@ -1,6 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { computeProcessGroups, mergeAuthoredGroups, type ProcessGroup } from "@/lib/derive/process";
+import {
+  computeProcessGroups,
+  computeProcessGroupsMerged,
+  callProcessPairs,
+  mergeAuthoredGroups,
+  type ProcessGroup,
+} from "@/lib/derive/process";
 import type { ManualLink } from "@/lib/backoffice/types";
+import type { N8nWorkflow } from "@/lib/n8n/types";
+
+// Minimal workflow with one Execute-Workflow node calling `callee`.
+function caller(id: string, callee: string): N8nWorkflow {
+  return {
+    id,
+    name: id,
+    active: true,
+    nodes: [
+      {
+        name: "call",
+        type: "n8n-nodes-base.executeWorkflow",
+        parameters: { workflowId: { value: callee } },
+      },
+    ],
+    connections: {},
+  };
+}
+
+function leaf(id: string): N8nWorkflow {
+  return { id, name: id, active: true, nodes: [], connections: {} };
+}
 
 const link = (fromId: string, toId: string, relation = "part-of-process"): ManualLink => ({
   id: `${fromId}-${toId}`,
@@ -32,7 +60,7 @@ describe("computeProcessGroups", () => {
 
   it("falls back to a default name when unnamed", () => {
     const g = computeProcessGroups([link("a", "b")], new Map())[0];
-    expect(g.name).toMatch(/process/i);
+    expect(g.name).toMatch(/linked/i);
   });
 
   it("keeps separate components as separate groups", () => {
@@ -77,5 +105,31 @@ describe("mergeAuthoredGroups", () => {
 
   it("returns derived groups unchanged when there are no authored SOPs", () => {
     expect(mergeAuthoredGroups([], derived)).toEqual(derived);
+  });
+});
+
+describe("callProcessPairs — utility exclusion", () => {
+  it("keeps a linear call chain (callee with a single caller)", () => {
+    const wfs = [caller("a", "b"), leaf("b")];
+    expect(callProcessPairs(wfs)).toEqual([["a", "b"]]);
+  });
+
+  it("excludes a shared utility called by >=3 distinct workflows", () => {
+    // util `u` is called by a, b, c — shared infrastructure, not a linked group.
+    const wfs = [caller("a", "u"), caller("b", "u"), caller("c", "u"), leaf("u")];
+    expect(callProcessPairs(wfs)).toEqual([]);
+  });
+
+  it("does not collapse unrelated callers of a utility into one group", () => {
+    const wfs = [caller("a", "u"), caller("b", "u"), caller("c", "u"), leaf("u")];
+    const groups = computeProcessGroupsMerged(wfs, [], new Map());
+    expect(groups).toHaveLength(0);
+  });
+});
+
+describe("default group name", () => {
+  it('names an unnamed derived group "Linked workflows"', () => {
+    const g = computeProcessGroups([link("a", "b")], new Map())[0];
+    expect(g.name).toBe("Linked workflows");
   });
 });

@@ -123,14 +123,14 @@ export function suggestionBlocks(s: SopSuggestion, names?: Map<string, string>):
   const title =
     s.kind === "add-to-sop"
       ? `🧩 *Add to ${s.targetSopName}?*`
-      : "🧩 *Suggested process — worth an SOP?*";
+      : "🧩 *These workflows look linked — group them?*";
   const body = s.rationale ?? s.reason;
   const footer = s.factLine ?? `Workflows: ${memberList}`;
 
   const accept =
     s.kind === "add-to-sop"
       ? button(`Add to ${s.targetSopName}`, "add_to_sop_suggestion", value, "primary")
-      : button("Create SOP", "create_sop_from_suggestion", value, "primary");
+      : button("Create group", "create_sop_from_suggestion", value, "primary");
 
   return [
     { type: "section", text: { type: "mrkdwn", text: `${title}\n${body}` } },

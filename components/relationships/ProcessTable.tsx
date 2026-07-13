@@ -42,8 +42,8 @@ export function ProcessTable({ rows }: GroupsView) {
 
       <PromptDialog
         open={dialogOpen}
-        title="New process"
-        label="Name this SOP — you can add workflows to it next."
+        title="New linked group"
+        label="Name this group — you can add workflows to it next."
         placeholder="e.g. Client onboarding"
         submitLabel="Create"
         busy={creating}
@@ -54,8 +54,8 @@ export function ProcessTable({ rows }: GroupsView) {
       {rows.length === 0 ? (
         <div className="grid flex-1 place-items-center px-6 py-12 text-center text-[13px] text-muted">
           <div>
-            <p className="mb-1 text-ink">No processes yet.</p>
-            <p className="text-faint">Create an SOP, then add the workflows that belong to it.</p>
+            <p className="mb-1 text-ink">No linked groups yet.</p>
+            <p className="text-faint">Create a group, then add the workflows that belong to it.</p>
           </div>
         </div>
       ) : (

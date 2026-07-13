@@ -64,9 +64,11 @@ function summariseItem(i: RegistryItem) {
   return {
     id: i.id,
     name: i.name,
-    type: i.type,
+    type: i.type, // deterministic = no AI, ai-assisted = LLM step, ai-agent-tools = AI agent w/ tools
     active: i.active,
     criticality: i.criticality,
+    usesAI: i.usesAI,
+    hasToolAccess: i.hasToolAccess,
     systems: i.systems,
     owner: i.owner?.team ?? null,
     recentFailures: i.health.recentFailures,
@@ -78,10 +80,12 @@ function detailItem(i: RegistryItem) {
   return {
     id: i.id,
     name: i.name,
-    type: i.type,
+    type: i.type, // deterministic = no AI, ai-assisted = LLM step, ai-agent-tools = AI agent w/ tools
     active: i.active,
     criticality: i.criticality,
     trigger: i.trigger,
+    usesAI: i.usesAI,
+    hasToolAccess: i.hasToolAccess,
     model: i.model,
     systems: i.systems,
     tools: i.toolNames,
@@ -130,7 +134,7 @@ const TOOLS: Tool[] = [
   {
     name: "search_workflows",
     description:
-      "Find workflows by free-text over name, system, tool, type, trigger, tag, or owning team. Use for 'what touches Stripe?', 'which agents can issue refunds?', 'what does RevOps own?'.",
+      "Find workflows by free-text over name, system, tool, type, trigger, tag, or owning team. Use for 'what touches Stripe?', 'which agents can issue refunds?', 'what does RevOps own?'. Each result carries usesAI + hasToolAccess + type, so this also answers 'is there any AI in workflow X?' — deterministic type / usesAI:false means no AI; ai-assisted means an LLM step; ai-agent-tools means an AI agent with tool access.",
     parameters: {
       type: "object",
       properties: { query: { type: "string", description: "search terms" } },
@@ -145,7 +149,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_workflow_detail",
     description:
-      "Full business-readable detail for one workflow id: type, owner, systems, tools, health, risk, last change, time saved.",
+      "Full business-readable detail for one workflow id: type, whether it uses AI (usesAI) and whether an AI agent has tool access (hasToolAccess), the model, owner, systems, tools, health, risk, last change, time saved. Answers 'does workflow X use AI / which model / what tools can it call?'.",
     parameters: {
       type: "object",
       properties: { id: { type: "string" } },
@@ -324,7 +328,7 @@ const TOOLS: Tool[] = [
   {
     name: "list_processes",
     description:
-      "List the business processes (chains of related workflows, auto-detected from call chains + manual links) with their end-to-end health. Use for 'what processes do we have?', 'which processes are broken?'.",
+      "List groups of linked workflows (chains of related workflows, auto-detected from call chains + manual links) with their end-to-end health. Linked does not imply a formal SOP — it means the workflows depend on each other. Use for 'what workflows are linked?', 'which linked groups are broken?'.",
     parameters: { type: "object", properties: {} },
     run: (_args, ctx) => {
       const pairs = callPairsOf(ctx);
@@ -338,10 +342,10 @@ const TOOLS: Tool[] = [
   {
     name: "process_status",
     description:
-      "End-to-end status of one business process: its ordered steps, health (healthy/degraded/stalled), where it's stalled, and the owner teams. Match by process name or by any member workflow name/id. Use for 'is the refund process healthy?', 'what's blocking the onboarding process?'.",
+      "End-to-end status of one group of linked workflows: its ordered steps, health (healthy/degraded/stalled), where it's stalled, and the owner teams. Match by group name or by any member workflow name/id. Use for 'are the refund workflows healthy?', 'what's blocking the onboarding chain?'.",
     parameters: {
       type: "object",
-      properties: { query: { type: "string", description: "process name or a member workflow name/id" } },
+      properties: { query: { type: "string", description: "linked-group name or a member workflow name/id" } },
       required: ["query"],
     },
     run: (args, ctx) => {

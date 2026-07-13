@@ -60,7 +60,7 @@ export function SopCreateDialog({
         onSubmit={submit}
         className="w-full max-w-md rounded-xl border border-line-2 bg-panel p-5 shadow-pop"
       >
-        <h2 className="text-[14px] font-semibold text-ink">Create SOP</h2>
+        <h2 className="text-[14px] font-semibold text-ink">Group linked workflows</h2>
         <p className="mt-1 text-[12px] text-muted">
           {memberNames.length} workflow{memberNames.length === 1 ? "" : "s"}:{" "}
           <span className="text-faint">{memberNames.join(", ")}</span>
@@ -85,7 +85,7 @@ export function SopCreateDialog({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
-          placeholder="What this process does and why these workflows belong together."
+          placeholder="What these linked workflows do and why they belong together."
           className="mt-1.5 w-full resize-y rounded-lg border border-line bg-panel-3 px-3 py-2 text-[13px] leading-snug text-ink placeholder:text-faint focus:border-accent focus:outline-none"
         />
 
@@ -94,7 +94,7 @@ export function SopCreateDialog({
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={!trimmed || busy}>
-            {busy ? "Creating…" : "Create SOP"}
+            {busy ? "Creating…" : "Create group"}
           </Button>
         </div>
       </form>

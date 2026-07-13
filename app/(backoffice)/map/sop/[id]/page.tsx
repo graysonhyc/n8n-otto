@@ -23,11 +23,11 @@ export default async function SopDetailPage({
         href="/map?view=groups"
         className="mb-3 inline-flex items-center gap-1 text-[12.5px] text-muted transition-colors hover:text-ink"
       >
-        ‹ Processes
+        ‹ Linked workflows
       </Link>
       <PageHeader
         title={data.sop.name}
-        subtitle="Process (SOP)"
+        subtitle="Linked workflows"
         actions={
           <div className="flex items-center gap-2">
             <SopRenameButton id={data.sop.id} current={data.sop.name} />

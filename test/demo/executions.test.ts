@@ -10,7 +10,7 @@ function wf(id: string, name: string): N8nWorkflow {
 
 const workflows = [
   wf("wY", "Sync Youtube Content Database"),
-  wf("wL", "Sync Linked Content Database"),
+  wf("wR", "Refund Review Agent"), // the failing head of the Refund SOP
   wf("wH", "Health Score Sync"),
 ];
 
@@ -19,17 +19,17 @@ describe("demoExecutionOverlay", () => {
 
   it("only emits executions for workflows present in the estate", () => {
     const ids = new Set(overlay.map((e) => e.workflowId));
-    expect(ids).toEqual(new Set(["wY", "wL", "wH"]));
+    expect(ids).toEqual(new Set(["wY", "wR", "wH"]));
   });
 
   it("gives the failing workflow ≥3 recent errors (enough to raise an incident)", () => {
-    const errs = overlay.filter((e) => e.workflowId === "wL" && e.status === "error");
+    const errs = overlay.filter((e) => e.workflowId === "wR" && e.status === "error");
     expect(errs.length).toBeGreaterThanOrEqual(3);
   });
 
   it("keeps the failing workflow's most recent execution an error (lastStatus)", () => {
     const mine = overlay
-      .filter((e) => e.workflowId === "wL")
+      .filter((e) => e.workflowId === "wR")
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
     expect(mine[0].status).toBe("error");
   });
