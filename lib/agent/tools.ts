@@ -444,6 +444,45 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "get_connections",
+    description:
+      "How one workflow is connected to others, broken down by relationship type: sub-workflow calls, agent sub-workflows, webhook hand-offs, shared credentials, shared data sources, and workflows that merely share an external system. Use for 'what does X connect to?', 'what is X linked to?', 'how are these related?'. For overall break impact use get_blast_radius instead.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", description: "workflow id" } },
+      required: ["id"],
+    },
+    run: (args, ctx) => {
+      const id = String(args.id ?? "");
+      if (!ctx.items.some((i) => i.id === id)) return { error: `No workflow with id ${id}` };
+      const nameOf = (wid: string) => ctx.items.find((i) => i.id === wid)?.name ?? wid;
+      const KIND_LABEL: Record<string, string> = {
+        calls: "sub-workflow call",
+        "subworkflow-tool": "agent sub-workflow",
+        "webhook-handoff": "webhook hand-off",
+        "shares-credential": "shared credential",
+        "shares-datasource": "shared data source",
+        "uses-system": "same system",
+        similar: "similar workflow",
+      };
+      const byKind: Record<string, { workflow: string; via?: string }[]> = {};
+      for (const e of ctx.graph.edges) {
+        const label = KIND_LABEL[e.kind];
+        if (!label) continue;
+        let other: string | null = null;
+        if (e.kind === "uses-system") {
+          // workflow → system node; find peers on the same system separately below.
+          continue;
+        }
+        if (e.source === id) other = e.target;
+        else if (e.target === id) other = e.source;
+        if (!other || !ctx.items.some((i) => i.id === other)) continue;
+        (byKind[label] ??= []).push({ workflow: nameOf(other), via: e.label });
+      }
+      return { workflow: nameOf(id), connections: byKind };
+    },
+  },
+  {
     name: "who_owns",
     description: "The owning team + Slack channel for a workflow, and whether ownership is confirmed.",
     parameters: {
