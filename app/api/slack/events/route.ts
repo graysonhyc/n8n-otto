@@ -58,8 +58,9 @@ export async function POST(request: Request) {
 
     // "on it" affordance — the Claude-tag working state.
     void client.reactions.add({ channel, timestamp: messageTs, name: "eyes" }).catch(() => {});
+    const thinking = parsed.kind === "dm" ? "🧠 On it…" : "🧠 Reading the thread…";
     const placeholder = await client.chat
-      .postMessage({ channel, thread_ts: threadTs, text: "🧠 Reading the thread…" })
+      .postMessage({ channel, thread_ts: threadTs, text: thinking })
       .catch(() => null);
     const placeholderTs = placeholder?.ts;
 

@@ -13,6 +13,10 @@ export type ParsedSlackEvent =
   | { kind: "challenge"; challenge: string }
   // A direct @mention — always answered.
   | ({ kind: "mention" } & TurnEvent)
+  // A 1-on-1 direct message — always answered, even the first one, no @mention
+  // needed. In a DM Otto is the only other party, so every human message is a
+  // question for it.
+  | ({ kind: "dm" } & TurnEvent)
   // An untagged reply inside a thread. The route answers only if Otto is already
   // part of that thread (it posted the brief/alert or was mentioned earlier).
   | ({ kind: "reply" } & TurnEvent)
@@ -23,6 +27,7 @@ interface AppMention {
   subtype?: string;
   text?: string;
   channel?: string;
+  channel_type?: string;
   user?: string;
   ts?: string;
   thread_ts?: string;
@@ -64,16 +69,33 @@ export function parseSlackEvent(body: unknown, botUserId: string): ParsedSlackEv
     };
   }
 
-  // A plain message: only a candidate when it's an untagged, human, threaded
-  // reply. We skip subtypes (edits/joins/etc.), non-threaded top-level messages,
-  // our own user id, and messages that tag the bot — those also arrive as
-  // `app_mention`, and handling both would double-reply.
+  // A plain message. We skip subtypes (edits/joins/etc.), our own messages, and
+  // any message that tags the bot — a tagged message also arrives as
+  // `app_mention` (in channels *and* DMs), and handling both would double-reply.
   if (event.type === "message") {
     if (event.subtype) return { kind: "ignore" };
-    if (!event.thread_ts) return { kind: "ignore" };
     if (event.user && event.user === botUserId) return { kind: "ignore" };
     const text = event.text ?? "";
     if (botUserId && text.includes(`<@${botUserId}>`)) return { kind: "ignore" };
+
+    // A 1-on-1 DM: answer every untagged message, top-level or threaded, even the
+    // first one — no thread membership needed. `thread_ts ?? ts` keeps an in-DM
+    // thread in context while letting a top-level DM reply under itself.
+    if (event.channel_type === "im") {
+      return {
+        kind: "dm",
+        text: stripMentions(text),
+        channel: event.channel,
+        threadTs: event.thread_ts ?? event.ts,
+        messageTs: event.ts,
+        userId: event.user ?? null,
+      };
+    }
+
+    // Otherwise a channel message: only a candidate when it's an untagged,
+    // threaded reply. Non-threaded top-level channel chatter is ignored so Otto
+    // doesn't wake on every message.
+    if (!event.thread_ts) return { kind: "ignore" };
     return {
       kind: "reply",
       text: stripMentions(text),

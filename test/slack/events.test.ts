@@ -128,4 +128,70 @@ describe("parseSlackEvent", () => {
     );
     expect(r).toEqual({ kind: "ignore" });
   });
+
+  it("answers an untagged top-level DM as kind 'dm' (threading under itself)", () => {
+    const r = parseSlackEvent(
+      {
+        type: "event_callback",
+        event: {
+          type: "message",
+          channel_type: "im",
+          text: "who owns Sync Linked?",
+          channel: "D123",
+          user: "U0HUMAN",
+          ts: "1720000000.000500",
+        },
+      },
+      BOT,
+    );
+    expect(r).toEqual({
+      kind: "dm",
+      text: "who owns Sync Linked?",
+      channel: "D123",
+      threadTs: "1720000000.000500",
+      messageTs: "1720000000.000500",
+      userId: "U0HUMAN",
+    });
+  });
+
+  it("keeps an in-DM thread in context when the user replies threaded", () => {
+    const r = parseSlackEvent(
+      {
+        type: "event_callback",
+        event: {
+          type: "message",
+          channel_type: "im",
+          text: "and its blast radius?",
+          channel: "D123",
+          user: "U0HUMAN",
+          ts: "1720000000.000600",
+          thread_ts: "1720000000.000500",
+        },
+      },
+      BOT,
+    );
+    expect(r).toMatchObject({ kind: "dm", threadTs: "1720000000.000500" });
+  });
+
+  it("ignores a DM that tags the bot (the app_mention twin handles it — no double reply)", () => {
+    const r = parseSlackEvent(
+      {
+        type: "event_callback",
+        event: { type: "message", channel_type: "im", text: "<@U0BOT> hi", channel: "D123", user: "U0HUMAN", ts: "1.8" },
+      },
+      BOT,
+    );
+    expect(r).toEqual({ kind: "ignore" });
+  });
+
+  it("ignores the bot's own DM messages (no self-reply loop)", () => {
+    const r = parseSlackEvent(
+      {
+        type: "event_callback",
+        event: { type: "message", channel_type: "im", text: "my answer", channel: "D123", user: BOT, ts: "1.9" },
+      },
+      BOT,
+    );
+    expect(r).toEqual({ kind: "ignore" });
+  });
 });
