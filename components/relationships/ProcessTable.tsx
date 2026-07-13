@@ -32,9 +32,9 @@ export function ProcessTable({ rows }: GroupsView) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <span className="text-[12px] font-semibold tracking-[0.08em] text-faint uppercase">Linked workflows</span>
+        <span className="text-[12px] font-semibold tracking-[0.08em] text-faint uppercase">Manually linked workflows</span>
         <Button variant="primary" onClick={() => setDialogOpen(true)} disabled={creating || pending}>
           + New linked group
         </Button>
@@ -52,7 +52,7 @@ export function ProcessTable({ rows }: GroupsView) {
       />
 
       {rows.length === 0 ? (
-        <div className="grid flex-1 place-items-center px-6 py-12 text-center text-[13px] text-muted">
+        <div className="grid place-items-center px-6 py-12 text-center text-[13px] text-muted">
           <div>
             <p className="mb-1 text-ink">No linked groups yet.</p>
             <p className="text-faint">Create a group, then add the workflows that belong to it.</p>

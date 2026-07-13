@@ -1,13 +1,5 @@
 import type { RelationshipsView } from "@/lib/data/map";
 
-const RELATION_LABEL: Record<string, string> = {
-  "depends-on": "depends on",
-  triggers: "triggers",
-  "duplicate-of": "duplicate of",
-  "part-of-process": "linked with",
-  "shares-data-with": "shares data with",
-};
-
 function Tile({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
     <div className="rounded-xl border border-line bg-panel p-4 shadow-card">
@@ -21,18 +13,17 @@ function Tile({ label, value, hint }: { label: string; value: number; hint?: str
 /**
  * Estate relationship summary + tables. Deliberately NOT an estate-wide graph
  * (does not scale): headline coupling metrics, the integrations shared by ≥2
- * workflows (blast surface), and the human-authored links.
+ * workflows (blast surface), and possible semantic duplicates.
  */
 export function RelationshipDashboard({ view }: { view: RelationshipsView }) {
-  const { summary, sharedIntegrations, manualLinks, duplicates } = view;
+  const { summary, sharedIntegrations, duplicates } = view;
   return (
     <div className="mb-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile label="Shared integrations" value={sharedIntegrations.length} hint="used by ≥2 workflows" />
         <Tile label="Connections" value={summary.connectionCount} hint="sub-calls, agents, webhooks" />
         <Tile label="Shared data sources" value={summary.dataSourceLinkCount} hint="same sheet/table/folder" />
         <Tile label="Possible duplicates" value={duplicates.length} hint="semantically similar" />
-        <Tile label="Manual links" value={manualLinks.length} hint="human-authored" />
       </div>
 
       <section className="rounded-xl border border-line bg-panel shadow-card">
@@ -98,39 +89,6 @@ export function RelationshipDashboard({ view }: { view: RelationshipsView }) {
           </table>
         </section>
       )}
-
-      <section className="rounded-xl border border-line bg-panel shadow-card">
-        <div className="border-b border-line px-4 py-3">
-          <h2 className="text-[11.5px] font-semibold tracking-[0.07em] text-muted uppercase">
-            Manually linked workflows
-          </h2>
-          <p className="mt-0.5 text-[11px] text-faint">
-            Links a human confirmed. Add or remove them from a workflow&apos;s Relationships tab.
-          </p>
-        </div>
-        {manualLinks.length === 0 ? (
-          <p className="px-4 py-6 text-[13px] text-faint">No manual links yet.</p>
-        ) : (
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-[11px] text-faint">
-                <th className="px-4 py-2 font-medium">From</th>
-                <th className="px-4 py-2 font-medium">Relation</th>
-                <th className="px-4 py-2 font-medium">To</th>
-              </tr>
-            </thead>
-            <tbody>
-              {manualLinks.map((l) => (
-                <tr key={l.id} className="border-t border-line-2">
-                  <td className="px-4 py-2 font-medium text-ink">{l.fromName}</td>
-                  <td className="px-4 py-2 text-muted">{RELATION_LABEL[l.relation] ?? l.relation}</td>
-                  <td className="px-4 py-2 font-medium text-ink">{l.toName}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
     </div>
   );
 }
