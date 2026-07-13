@@ -22,6 +22,12 @@ features:
     # display_name allows only a-z 0-9 - _ .  (no spaces, no uppercase)
     display_name: n8n-otto
     always_online: true
+  # App Home: enable the Messages tab so users can DM Otto directly. Without this
+  # the Messages tab shows Slack's default "still a work in progress" placeholder.
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
 
 oauth_config:
   redirect_urls:
@@ -37,6 +43,10 @@ oauth_config:
       - channels:history
       - groups:history
       - reactions:write
+      # DMs: read incoming direct messages so Otto can answer them. chat:write
+      # (above) covers posting the reply back.
+      - im:history
+      - im:read
 
 settings:
   event_subscriptions:
@@ -44,6 +54,8 @@ settings:
     request_url: https://n8n-backoffice.vercel.app/api/slack/events
     bot_events:
       - app_mention
+      # Deliver 1-on-1 DMs to the same endpoint (parseSlackEvent -> kind "dm").
+      - message.im
   interactivity:
     is_enabled: true
     request_url: https://n8n-backoffice.vercel.app/api/slack/interactivity
