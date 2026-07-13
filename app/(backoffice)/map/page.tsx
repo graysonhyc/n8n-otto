@@ -1,18 +1,13 @@
 import { PageHeader } from "@/components/shell/AppShell";
 import { Chip } from "@/components/ui/Chip";
 import { ProcessTable } from "@/components/relationships/ProcessTable";
-import { SuggestedProcesses } from "@/components/relationships/SuggestedProcesses";
 import { RelationshipDashboard } from "@/components/relationships/RelationshipDashboard";
-import { loadGroups, loadRelationshipsView, loadSuggestions } from "@/lib/data/map";
+import { loadGroups, loadRelationshipsView } from "@/lib/data/map";
 
 export const dynamic = "force-dynamic";
 
 export default async function RelationshipsPage() {
-  const [groups, { suggestions }, relationships] = await Promise.all([
-    loadGroups(),
-    loadSuggestions(),
-    loadRelationshipsView(),
-  ]);
+  const [groups, relationships] = await Promise.all([loadGroups(), loadRelationshipsView()]);
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -29,7 +24,6 @@ export default async function RelationshipsPage() {
         actions={<Chip>{groups.live ? "Live instance" : "Demo data"}</Chip>}
       />
       <RelationshipDashboard view={relationships} />
-      <SuggestedProcesses suggestions={suggestions} />
       <ProcessTable {...groups} />
     </div>
   );

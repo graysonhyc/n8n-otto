@@ -27,8 +27,7 @@ export function RelationshipDashboard({ view }: { view: RelationshipsView }) {
   const { summary, sharedIntegrations, manualLinks, duplicates } = view;
   return (
     <div className="mb-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Tile label="Integrations" value={summary.integrationCount} hint="distinct services" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Tile label="Shared integrations" value={sharedIntegrations.length} hint="used by ≥2 workflows" />
         <Tile label="Connections" value={summary.connectionCount} hint="sub-calls, agents, webhooks" />
         <Tile label="Shared data sources" value={summary.dataSourceLinkCount} hint="same sheet/table/folder" />

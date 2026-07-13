@@ -34,9 +34,9 @@ export function ProcessTable({ rows }: GroupsView) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <span className="text-[12px] font-semibold tracking-[0.08em] text-faint uppercase">Processes</span>
+        <span className="text-[12px] font-semibold tracking-[0.08em] text-faint uppercase">Linked workflows</span>
         <Button variant="primary" onClick={() => setDialogOpen(true)} disabled={creating || pending}>
-          + New process
+          + New linked group
         </Button>
       </div>
 
@@ -63,7 +63,7 @@ export function ProcessTable({ rows }: GroupsView) {
           <table className="w-full text-left text-[13px]">
             <thead className="sticky top-0 bg-panel-2 text-[11px] tracking-wide text-faint uppercase">
               <tr>
-                <th className="px-4 py-2 font-medium">Process</th>
+                <th className="px-4 py-2 font-medium">Group</th>
                 <th className="px-4 py-2 font-medium">Description</th>
                 <th className="w-24 px-4 py-2 text-right font-medium">Workflows</th>
                 <th className="w-28 px-4 py-2 text-right font-medium">Updated</th>
