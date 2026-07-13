@@ -8,7 +8,7 @@ import { composeGraph } from "@/lib/derive/graph";
 import { blastRadius, type BlastRadius } from "@/lib/derive/blast";
 import { buildBrief, type BriefItem } from "@/lib/brief/build";
 import { computeDailyBrief, type DailyBrief } from "@/lib/brief/daily";
-import { groupBriefsByChannel, type ChannelBrief } from "@/lib/brief/channels";
+import { groupBriefsByChannel, type ChannelBrief, type ArchivedRef } from "@/lib/brief/channels";
 import { masterChannelId } from "@/lib/slack/post";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner, ManualLink } from "@/lib/backoffice/types";
@@ -109,7 +109,7 @@ export interface ChannelBriefsView {
 // bucket gets its own scoped Yesterday/Today/Explore brief plus its attention
 // items. Shared by the manual "Send to Slack" action and the morning cron.
 export async function loadChannelBriefs(): Promise<ChannelBriefsView> {
-  const [{ workflows, executions, live }, owners, states, links, groupNames, { changes, scanned }] =
+  const [{ workflows, archived, executions, live }, owners, states, links, groupNames, { changes, scanned }] =
     await Promise.all([
       loadInstance(),
       getAllOwners(),
@@ -128,14 +128,23 @@ export async function loadChannelBriefs(): Promise<ChannelBriefsView> {
     (b) => states.get(b.key) !== "dismissed",
   );
 
+  // Route each archived workflow to its team's channel so the per-team archived
+  // count lands in the right bucket, even though archived workflows never reach
+  // the registry (excluded at the n8n client).
+  const master = masterChannelId();
+  const archivedRefs: ArchivedRef[] = archived.flatMap((w) => {
+    const owner = owners.get(w.id);
+    const channelId = owner?.slackChannelId ?? master;
+    return channelId ? [{ channelId, channelName: owner?.slackChannelName ?? null }] : [];
+  });
+
   const channels = groupBriefsByChannel({
     items,
     executions,
-    changes,
     attention,
-    sharedCredentials,
+    archived: archivedRefs,
     now,
-    masterChannelId: masterChannelId(),
+    masterChannelId: master,
   });
   return { channels, live, scanned };
 }

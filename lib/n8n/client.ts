@@ -10,6 +10,8 @@ import { excludeArchived } from "./filter";
 
 export interface N8nClient {
   listWorkflows(): Promise<N8nWorkflow[]>;
+  /** One fetch, split into live (archived excluded) and archived workflows. */
+  listWorkflowsWithArchived(): Promise<{ active: N8nWorkflow[]; archived: N8nWorkflow[] }>;
   getWorkflow(id: string): Promise<N8nWorkflow>;
   listExecutions(limit?: number): Promise<N8nExecution[]>;
 }
@@ -52,6 +54,10 @@ export function createN8nClient(baseUrl: string, apiKey: string): N8nClient {
 
   return {
     listWorkflows: async () => excludeArchived(await getAll<N8nWorkflow>("/workflows")),
+    listWorkflowsWithArchived: async () => {
+      const all = await getAll<N8nWorkflow>("/workflows");
+      return { active: excludeArchived(all), archived: all.filter((w) => w.isArchived) };
+    },
     getWorkflow: (id: string) => get<N8nWorkflow>(`/workflows/${id}`),
     listExecutions: (limit = 250) =>
       getAll<N8nExecution>("/executions", { limit: String(limit) }),

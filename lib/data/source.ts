@@ -6,7 +6,8 @@ import { demoExecutionOverlay } from "@/lib/demo/executions";
 import type { N8nExecution, N8nWorkflow } from "@/lib/n8n/types";
 
 export interface Instance {
-  workflows: N8nWorkflow[];
+  workflows: N8nWorkflow[]; // live (archived excluded) — what the registry/map/brief operate on
+  archived: N8nWorkflow[]; // archived workflows, kept only for counts (e.g. per-team brief stats)
   executions: N8nExecution[];
   live: boolean; // true when reading a real n8n instance, false when using demo fixtures
 }
@@ -24,11 +25,11 @@ const INSTANCE_TTL_SECONDS = 20;
 const fetchLiveInstance = unstable_cache(
   async (): Promise<Instance> => {
     const client = n8nFromEnv()!;
-    const [workflows, executions] = await Promise.all([
-      client.listWorkflows(),
+    const [{ active, archived }, executions] = await Promise.all([
+      client.listWorkflowsWithArchived(),
       client.listExecutions(),
     ]);
-    return { workflows, executions, live: true };
+    return { workflows: active, archived, executions, live: true };
   },
   ["n8n-instance"],
   { revalidate: INSTANCE_TTL_SECONDS, tags: [INSTANCE_CACHE_TAG] },
@@ -41,7 +42,12 @@ const fetchLiveInstance = unstable_cache(
 // (the instance itself is barely exercised). See lib/demo/executions.ts.
 export async function loadInstance(): Promise<Instance> {
   if (!n8nFromEnv()) {
-    return { workflows: allWorkflows, executions: demoExecutions, live: false };
+    return {
+      workflows: allWorkflows.filter((w) => !w.isArchived),
+      archived: allWorkflows.filter((w) => w.isArchived),
+      executions: demoExecutions,
+      live: false,
+    };
   }
   const instance = await fetchLiveInstance();
   if (process.env.DEMO_EXECUTIONS === "1") {

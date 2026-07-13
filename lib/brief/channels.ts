@@ -1,29 +1,34 @@
 import type { N8nExecution } from "@/lib/n8n/types";
 import type { RegistryItem } from "@/lib/derive/registry";
-import type { ChangeEvent } from "@/lib/diff/snapshot";
-import type { BriefItem, SharedCredentialInfo } from "./build";
-import { computeDailyBrief, type DailyBrief } from "./daily";
+import type { BriefItem } from "./build";
+import { computeTeamStats, type TeamStats } from "./teamStats";
+
+// An archived workflow's channel routing (resolved in the data layer against its
+// owner assignment), so a team's archived count lands in the right bucket even
+// when the workflow itself is filtered out of the registry.
+export interface ArchivedRef {
+  channelId: string;
+  channelName: string | null;
+}
 
 export interface ChannelBrief {
   channelId: string;
   channelName: string | null;
-  daily: DailyBrief;
+  stats: TeamStats;
   attention: BriefItem[];
 }
 
-// Split the estate into one brief per Slack channel. The channel comes from each
-// workflow's owner assignment (owner.slackChannelId); workflows with no channel
-// fall back to `masterChannelId` (the catch-all ops channel) when one is given,
-// and are skipped only when there is no fallback either. computeDailyBrief
-// self-scopes on the items passed (it builds its own id index and ignores
-// executions/changes for unknown ids), so we only need to filter items, shared
-// credentials, and attention per channel.
+// Split the estate into one brief per Slack channel (≈ per team). The channel
+// comes from each workflow's owner assignment (owner.slackChannelId); workflows
+// with no channel fall back to `masterChannelId` (the catch-all ops channel) when
+// one is given, and are skipped only when there is no fallback either. Each
+// bucket gets a deterministic TeamStats snapshot (scoped active items + archived
+// count) plus its own attention items for the ticket-candidate highlight.
 export function groupBriefsByChannel(input: {
   items: RegistryItem[];
   executions: N8nExecution[];
-  changes: Map<string, ChangeEvent[]>;
   attention: BriefItem[];
-  sharedCredentials: SharedCredentialInfo[];
+  archived?: ArchivedRef[];
   now: number;
   offsetMin?: number;
   masterChannelId?: string;
@@ -40,23 +45,28 @@ export function groupBriefsByChannel(input: {
     bucket.ids.add(item.id);
   }
 
+  // Fold in archived counts per channel; seed a bucket for any team that owns
+  // only archived workflows so it still gets a (mostly-zero) brief.
+  const archivedCounts = new Map<string, number>();
+  for (const a of input.archived ?? []) {
+    archivedCounts.set(a.channelId, (archivedCounts.get(a.channelId) ?? 0) + 1);
+    if (!buckets.has(a.channelId)) {
+      buckets.set(a.channelId, { channelName: a.channelName, ids: new Set() });
+    }
+  }
+
   const out: ChannelBrief[] = [];
   for (const [channelId, { channelName, ids }] of buckets) {
     const items = input.items.filter((i) => ids.has(i.id));
-    const sharedCredentials = input.sharedCredentials.filter((c) =>
-      c.workflowIds.some((id) => ids.has(id)),
-    );
     const attention = input.attention.filter((a) => a.workflowId != null && ids.has(a.workflowId));
-    const daily = computeDailyBrief({
+    const stats = computeTeamStats({
       items,
       executions: input.executions,
-      changes: input.changes,
-      attention,
-      sharedCredentials,
+      archived: archivedCounts.get(channelId) ?? 0,
       now: input.now,
       offsetMin: input.offsetMin,
     });
-    out.push({ channelId, channelName, daily, attention });
+    out.push({ channelId, channelName, stats, attention });
   }
   return out;
 }

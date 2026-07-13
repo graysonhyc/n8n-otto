@@ -1,6 +1,7 @@
 import type { KnownBlock } from "@slack/web-api";
 import type { BriefItem, Severity } from "@/lib/brief/build";
 import type { DailyBrief } from "@/lib/brief/daily";
+import type { TeamStats } from "@/lib/brief/teamStats";
 import type { SopSuggestion } from "@/lib/derive/suggestions";
 
 const EMOJI: Record<Severity, string> = { high: "🔴", medium: "🟠", low: "🟡" };
@@ -55,6 +56,42 @@ export function briefItemBlocks(item: BriefItem, routedNote?: string): KnownBloc
     actions.push(button("Rollback prompt", "rollback_prompt", value, "danger"));
   }
   blocks.push({ type: "actions", elements: actions.slice(0, 5) });
+  return blocks;
+}
+
+// The team's morning digest header: exact estate counts + run health for the
+// day, then up to three insight lines. Deterministic ground truth — no LLM prose
+// — so the numbers a channel sees are always verifiable. Ticket-worthy issues
+// are posted as separate cards after this (see sendDailyBrief).
+export function teamBriefBlocks(teamName: string, stats: TeamStats): KnownBlock[] {
+  const errValue =
+    stats.withErrors === 0
+      ? "0"
+      : `${stats.withErrors}${stats.incidents ? ` · ${stats.incidents} incident${stats.incidents === 1 ? "" : "s"}` : ""}`;
+  const runsValue =
+    stats.runs === 0
+      ? "no production runs"
+      : `${stats.failedRuns}/${stats.runs} failed (${stats.failureRate}%)`;
+  const topErrorValue = stats.topError ? `${stats.topError.name} (${stats.topError.errors})` : "—";
+
+  const blocks: KnownBlock[] = [
+    { type: "header", text: { type: "plain_text", text: `${teamName} — Daily Brief`, emoji: true } },
+    { type: "context", elements: [{ type: "mrkdwn", text: `📅 Runs for ${stats.dateLabel}` }] },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Active*\n${stats.active}` },
+        { type: "mrkdwn", text: `*Archived*\n${stats.archived}` },
+        { type: "mrkdwn", text: `*With errors*\n${errValue}` },
+        { type: "mrkdwn", text: `*Runs*\n${runsValue}` },
+        { type: "mrkdwn", text: `*Top error source*\n${topErrorValue}` },
+        { type: "mrkdwn", text: `*Paused*\n${stats.paused}` },
+      ],
+    },
+  ];
+  if (stats.insights.length) {
+    blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `💡 ${stats.insights.join("  ·  ")}` }] });
+  }
   return blocks;
 }
 

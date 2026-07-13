@@ -6,14 +6,6 @@
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron/escalate",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/notify",
-      "schedule": "0 8 * * *"
-    },
-    {
       "path": "/api/cron/suggestions",
       "schedule": "0 9 * * *"
     }

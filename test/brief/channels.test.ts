@@ -30,18 +30,11 @@ describe("groupBriefsByChannel", () => {
     ]);
     const items = composeRegistry({ workflows: allWorkflows, executions, owners, now: NOW });
 
-    const briefs = groupBriefsByChannel({
-      items,
-      executions,
-      changes: new Map(),
-      attention: [],
-      sharedCredentials: [],
-      now: NOW,
-    });
+    const briefs = groupBriefsByChannel({ items, executions, attention: [], now: NOW });
 
     const channels = briefs.map((b) => b.channelId).sort();
     expect(channels).toEqual(["C_A", "C_B"]);
-    expect(briefs.every((b) => b.daily.yesterday !== undefined)).toBe(true);
+    expect(briefs.every((b) => b.stats.dateLabel !== undefined)).toBe(true);
   });
 
   it("routes unowned workflows to the master channel when one is given", () => {
@@ -51,9 +44,7 @@ describe("groupBriefsByChannel", () => {
     const briefs = groupBriefsByChannel({
       items,
       executions,
-      changes: new Map(),
       attention: [],
-      sharedCredentials: [],
       now: NOW,
       masterChannelId: "C_MASTER",
     });
@@ -62,21 +53,36 @@ describe("groupBriefsByChannel", () => {
     expect(channels).toEqual(["C_A", "C_MASTER"]);
   });
 
-  it("scopes yesterday stats to only the channel's workflows", () => {
+  it("scopes active count to only the channel's workflows", () => {
     const ids = allWorkflows.map((w) => w.id);
     const owners = new Map<string, Owner>([[ids[0], owner(ids[0], "C_ONLY")]]);
+    const items = composeRegistry({ workflows: allWorkflows, executions, owners, now: NOW });
+    const briefs = groupBriefsByChannel({ items, executions, attention: [], now: NOW });
+    expect(briefs).toHaveLength(1);
+    // Only the single owned workflow is in this channel's bucket.
+    expect(briefs[0].stats.active + briefs[0].stats.paused).toBe(1);
+  });
+
+  it("counts archived workflows per channel and seeds an archived-only team", () => {
+    const ids = allWorkflows.map((w) => w.id);
+    const owners = new Map<string, Owner>([[ids[0], owner(ids[0], "C_A")]]);
     const items = composeRegistry({ workflows: allWorkflows, executions, owners, now: NOW });
     const briefs = groupBriefsByChannel({
       items,
       executions,
-      changes: new Map(),
       attention: [],
-      sharedCredentials: [],
+      archived: [
+        { channelId: "C_A", channelName: "#growth" },
+        { channelId: "C_ARCHIVED_ONLY", channelName: "#legacy" },
+      ],
       now: NOW,
     });
-    expect(briefs).toHaveLength(1);
-    // Only the single owned workflow can be counted; ≤1 active regardless of whether it ran.
-    expect(briefs[0].daily.yesterday.activeWorkflows).toBeLessThanOrEqual(1);
+    const a = briefs.find((b) => b.channelId === "C_A")!;
+    const legacy = briefs.find((b) => b.channelId === "C_ARCHIVED_ONLY")!;
+    expect(a.stats.archived).toBe(1);
+    // A team with only archived workflows still gets a brief (0 active, 1 archived).
+    expect(legacy.stats.active).toBe(0);
+    expect(legacy.stats.archived).toBe(1);
   });
 
   it("routes attention items to their workflow's channel only", () => {
@@ -100,14 +106,7 @@ describe("groupBriefsByChannel", () => {
         actions: [],
       },
     ];
-    const briefs = groupBriefsByChannel({
-      items,
-      executions,
-      changes: new Map(),
-      attention,
-      sharedCredentials: [],
-      now: NOW,
-    });
+    const briefs = groupBriefsByChannel({ items, executions, attention, now: NOW });
     const a = briefs.find((b) => b.channelId === "C_A")!;
     const b = briefs.find((b) => b.channelId === "C_B")!;
     expect(a.attention).toHaveLength(1);

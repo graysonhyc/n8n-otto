@@ -22,6 +22,7 @@ const item = {
 const blast: BlastRadius = {
   workflowId: "wf1",
   downstreamWorkflowIds: ["wf2"],
+  advisoryWorkflowIds: [],
   systems: ["Stripe"],
   processGroup: { key: "pg:wf1|wf2", name: "Refund process", workflowIds: ["wf1", "wf2"] },
   affectedOwnerTeams: ["RevOps", "Support"],
@@ -58,6 +59,7 @@ describe("buildTicket", () => {
     const emptyBlast: BlastRadius = {
       workflowId: "wf1",
       downstreamWorkflowIds: [],
+      advisoryWorkflowIds: [],
       systems: [],
       processGroup: null,
       affectedOwnerTeams: [],

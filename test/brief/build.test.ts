@@ -60,6 +60,7 @@ describe("buildBrief", () => {
           {
             workflowId: "wf_refund_review_agent",
             downstreamWorkflowIds: ["wf_customer_onboarding"],
+            advisoryWorkflowIds: [],
             systems: [],
             processGroup: { key: "pg:x", name: "Refund process", workflowIds: ["wf_refund_review_agent"] },
             affectedOwnerTeams: ["RevOps"],
