@@ -1,4 +1,5 @@
 import type { N8nWorkflow } from "@/lib/n8n/types";
+import { integrationForNode } from "./integrations";
 
 // Relationship edges, tagged by reliability tier:
 //   A = exact (from workflow structure), B/C = heuristic (shown as "possible").
@@ -37,10 +38,6 @@ export interface SystemEdge {
 const AGENT_TYPE = "@n8n/n8n-nodes-langchain.agent";
 const EXECUTE_WORKFLOW_TYPE = "n8n-nodes-base.executeWorkflow";
 const TOOL_WORKFLOW_TYPE = "@n8n/n8n-nodes-langchain.toolWorkflow";
-
-function baseName(type: string): string {
-  return type.split(".").pop() ?? type;
-}
 
 /** Extract the referenced workflow id from an Execute Workflow node's parameters. */
 function referencedWorkflowId(params: Record<string, unknown> | undefined): string | null {
@@ -236,20 +233,6 @@ export function sharedCredentialEdges(workflows: N8nWorkflow[]): SharedCredentia
   return edges;
 }
 
-const SYSTEM_BY_NODE: Record<string, string> = {
-  slack: "Slack",
-  hubspot: "HubSpot",
-  salesforce: "Salesforce",
-  stripe: "Stripe",
-  stripeTrigger: "Stripe",
-  zendesk: "Zendesk",
-  gmail: "Gmail",
-  googleBigQuery: "BigQuery",
-  googleSheets: "Google Sheets",
-  postgres: "Postgres",
-  notion: "Notion",
-};
-
 /** Resource identifier within a system, when the node params reveal one. */
 // A resource param is either a plain string or an n8n resource-locator object
 // ({ __rl: true, value, mode }). Unwrap the latter to its id, like
@@ -263,7 +246,7 @@ function resolveResource(v: unknown): string | null {
   return null;
 }
 
-const RESOURCE_KEYS = ["channel", "channelId", "table", "sheetId", "documentId"];
+const RESOURCE_KEYS = ["channel", "channelId", "table", "sheetId", "documentId", "folderId"];
 
 function resourceKey(params: Record<string, unknown> | undefined): string | null {
   if (!params) return null;
@@ -291,9 +274,7 @@ function resourceDisplayName(params: Record<string, unknown> | undefined): strin
 export function systemEdges(workflow: N8nWorkflow): SystemEdge[] {
   const edges: SystemEdge[] = [];
   for (const node of workflow.nodes) {
-    const base = baseName(node.type);
-    const normalized = base.endsWith("Tool") ? base.slice(0, -4) : base;
-    const system = SYSTEM_BY_NODE[normalized];
+    const system = integrationForNode(node);
     if (!system) continue;
     edges.push({
       workflowId: workflow.id,
@@ -324,9 +305,7 @@ export function sharedDataSourceGroups(workflows: N8nWorkflow[]): DataSourceGrou
   const byRes = new Map<string, { system: string; resource: string; name: string | null; ids: Set<string> }>();
   for (const wf of workflows) {
     for (const node of wf.nodes) {
-      const base = baseName(node.type);
-      const normalized = base.endsWith("Tool") ? base.slice(0, -4) : base;
-      const system = SYSTEM_BY_NODE[normalized];
+      const system = integrationForNode(node);
       const resource = resourceKey(node.parameters);
       if (!system || !resource) continue;
       const key = `res:${system}:${resource}`;

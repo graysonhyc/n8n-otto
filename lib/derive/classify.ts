@@ -5,6 +5,7 @@ import type {
   TriggerKind,
   WorkflowType,
 } from "@/lib/n8n/types";
+import { integrationForNode } from "./integrations";
 
 const LANGCHAIN_PREFIX = "@n8n/n8n-nodes-langchain.";
 const AGENT_TYPE = "@n8n/n8n-nodes-langchain.agent";
@@ -21,39 +22,6 @@ const TRIGGER_KINDS: Record<string, TriggerKind> = {
   "n8n-nodes-base.executeWorkflowTrigger": "sub-workflow",
 };
 
-// Node type → business system name.
-const SYSTEM_BY_NODE: Record<string, string> = {
-  slack: "Slack",
-  hubspot: "HubSpot",
-  salesforce: "Salesforce",
-  stripe: "Stripe",
-  stripeTrigger: "Stripe",
-  zendesk: "Zendesk",
-  gmail: "Gmail",
-  googleBigQuery: "BigQuery",
-  postgres: "Postgres",
-  snowflake: "Snowflake",
-  notion: "Notion",
-  intercom: "Intercom",
-};
-
-// Credential type → business system name.
-const SYSTEM_BY_CRED: Record<string, string> = {
-  slackApi: "Slack",
-  slackOAuth2Api: "Slack",
-  hubspotApi: "HubSpot",
-  hubspotOAuth2Api: "HubSpot",
-  salesforceOAuth2Api: "Salesforce",
-  stripeApi: "Stripe",
-  zendeskApi: "Zendesk",
-  gmailOAuth2: "Gmail",
-  googleBigQueryOAuth2Api: "BigQuery",
-  postgres: "Postgres",
-  snowflake: "Snowflake",
-  notionApi: "Notion",
-  intercomApi: "Intercom",
-};
-
 const HUMAN_IN_LOOP_TYPES = new Set([
   "n8n-nodes-base.wait",
   "n8n-nodes-base.approvalTrigger",
@@ -64,16 +32,9 @@ function baseName(type: string): string {
   return type.split(".").pop() ?? type;
 }
 
-function systemForNode(node: N8nNode): string | null {
-  const base = baseName(node.type);
-  // direct or *Tool variant (stripeTool → stripe)
-  const normalized = base.endsWith("Tool") ? base.slice(0, -4) : base;
-  if (SYSTEM_BY_NODE[normalized]) return SYSTEM_BY_NODE[normalized];
-  for (const credType of Object.keys(node.credentials ?? {})) {
-    if (SYSTEM_BY_CRED[credType]) return SYSTEM_BY_CRED[credType];
-  }
-  return null;
-}
+// Generic detection (node type + credential type + sub-nodes), shared with the
+// relationship graph. Covers any service, not a hardcoded allow-list.
+const systemForNode = integrationForNode;
 
 /** Find node names connected to an agent via `ai_tool` connections. */
 function findAgentTools(workflow: N8nWorkflow): string[] {
