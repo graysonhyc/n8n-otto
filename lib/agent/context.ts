@@ -7,6 +7,7 @@ import { credentialGroups } from "@/lib/derive/edges";
 import { blastRadius } from "@/lib/derive/blast";
 import { buildBrief, type BriefItem } from "@/lib/brief/build";
 import type { AuthoredSop } from "@/lib/derive/process";
+import type { SimilarPair } from "@/lib/derive/similarity";
 
 // The single snapshot every agent tool reads from during one turn: the
 // business-readable registry, the dependency graph (which carries the edges +
@@ -32,6 +33,8 @@ export interface RawInstance {
   live?: boolean;
   /** Hand-authored SOPs so the agent sees the same processes as the /map board. */
   sops?: AuthoredSop[];
+  /** Semantic-similar pairs (from embeddings), computed async upstream. */
+  similar?: SimilarPair[];
   /** Behaviour-change events (from snapshot diffing). Optional: when omitted the
    *  brief still surfaces incident/ownership/governance/hygiene/shared items. */
   changes?: Map<string, ChangeEvent[]>;
@@ -39,9 +42,9 @@ export interface RawInstance {
 
 /** Pure composition — no I/O, so it is unit-testable against fixtures. */
 export function composeAgentContext(input: RawInstance): AgentContext {
-  const { workflows, executions, owners, links, groupNames, now, live = false, sops } = input;
+  const { workflows, executions, owners, links, groupNames, now, live = false, sops, similar } = input;
   const items = composeRegistry({ workflows, executions, owners, now });
-  const graph = composeGraph({ workflows, executions, owners, links, groupNames, now, sops });
+  const graph = composeGraph({ workflows, executions, owners, links, groupNames, now, sops, similar });
 
   // Reconstruct the brief's attention items from data already in hand — no extra
   // I/O so every Slack turn stays fast. Blast notes come from the graph we just

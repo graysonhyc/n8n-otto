@@ -483,6 +483,29 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "get_similar_workflows",
+    description:
+      "Possible duplicate / near-identical workflows, detected by semantic similarity of their purpose (name, description, integrations, prompts). Use for 'do we have duplicate agents?', 'is anything similar to X?', 'where are we doing the same job twice?'. Pass a workflow id to scope to one; omit for the whole estate. Scores are 0-1 (higher = more alike).",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "string", description: "optional: scope to one workflow id" } },
+    },
+    run: (args, ctx) => {
+      const id = args.id ? String(args.id) : null;
+      const nameOf = (wid: string) => ctx.items.find((i) => i.id === wid)?.name ?? wid;
+      const pairs = ctx.graph.edges
+        .filter((e) => e.kind === "similar")
+        .filter((e) => !id || e.source === id || e.target === id)
+        .map((e) => ({
+          a: nameOf(e.source),
+          b: nameOf(e.target),
+          score: Number(e.label ?? 0),
+        }))
+        .sort((x, y) => y.score - x.score);
+      return { count: pairs.length, possibleDuplicates: pairs };
+    },
+  },
+  {
     name: "who_owns",
     description: "The owning team + Slack channel for a workflow, and whether ownership is confirmed.",
     parameters: {

@@ -3,6 +3,7 @@ import type { Owner, ManualLink } from "@/lib/backoffice/types";
 import { composeRegistryItem } from "./registry";
 import { systemEdges } from "./edges";
 import { deriveRelationships, type RelationshipKind } from "./relationships";
+import type { SimilarPair } from "./similarity";
 import {
   computeProcessGroupsMerged,
   mergeAuthoredGroups,
@@ -82,12 +83,15 @@ export interface ComposeGraphInput {
   now: number;
   /** Hand-authored SOPs. When present they override auto-detected clusters. */
   sops?: AuthoredSop[];
+  /** Semantic-similar pairs (from embeddings). Computed async upstream and passed
+   *  in so composeGraph stays pure. Emitted as tier-S "similar" edges. */
+  similar?: SimilarPair[];
 }
 
 const systemNodeId = (name: string) => `system:${name}`;
 
 export function composeGraph(input: ComposeGraphInput): WorkflowGraph {
-  const { workflows, executions, owners, links, groupNames, now, sops } = input;
+  const { workflows, executions, owners, links, groupNames, now, sops, similar } = input;
   const ids = new Set(workflows.map((w) => w.id));
 
   const derivedGroups = computeProcessGroupsMerged(workflows, links, groupNames);
@@ -135,6 +139,19 @@ export function composeGraph(input: ComposeGraphInput): WorkflowGraph {
       kind: m.kind,
       tier: m.tier,
       label: e.label,
+    });
+  }
+
+  // Tier S: semantic-similar pairs (from embeddings, computed async upstream).
+  for (const p of similar ?? []) {
+    if (!ids.has(p.a) || !ids.has(p.b)) continue;
+    edges.push({
+      id: `similar:${p.a}->${p.b}`,
+      source: p.a,
+      target: p.b,
+      kind: "similar",
+      tier: "S",
+      label: p.score.toFixed(2),
     });
   }
 

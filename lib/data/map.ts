@@ -8,6 +8,7 @@ import { composeRegistry, composeRegistryItem } from "@/lib/derive/registry";
 import { computeBySystem } from "@/lib/derive/overview";
 import { deriveRelationships, type RelationshipSummary } from "@/lib/derive/relationships";
 import { workflowIntegrations } from "@/lib/derive/integrations";
+import { computeSimilarPairs } from "./duplicates";
 import type { LinkRelation, Sop } from "@/lib/backoffice/types";
 import type { N8nWorkflow, N8nExecution } from "@/lib/n8n/types";
 import type { Owner } from "@/lib/backoffice/types";
@@ -89,10 +90,18 @@ export interface ManualLinkRow {
   source: string;
 }
 
+/** A possible-duplicate pair for the relationships table. */
+export interface DuplicateRow {
+  aName: string;
+  bName: string;
+  score: number;
+}
+
 export interface RelationshipsView {
   summary: RelationshipSummary;
   sharedIntegrations: SharedIntegrationRow[];
   manualLinks: ManualLinkRow[];
+  duplicates: DuplicateRow[];
   live: boolean;
 }
 
@@ -103,9 +112,17 @@ export interface RelationshipsView {
  */
 export async function loadRelationshipsView(): Promise<RelationshipsView> {
   const [{ workflows, live }, links] = await Promise.all([loadInstance(), getAllLinks()]);
+  const similar = await computeSimilarPairs(workflows);
   const nameById = new Map(workflows.map((w) => [w.id, w.name]));
 
   const { summary } = deriveRelationships(workflows);
+  summary.duplicateCount = similar.length;
+
+  const duplicates: DuplicateRow[] = similar.map((p) => ({
+    aName: nameById.get(p.a) ?? p.a,
+    bName: nameById.get(p.b) ?? p.b,
+    score: p.score,
+  }));
 
   // integration → workflows that use it (incl. sub-nodes), ≥2 = shared.
   const users = new Map<string, string[]>();
@@ -131,7 +148,7 @@ export async function loadRelationshipsView(): Promise<RelationshipsView> {
     source: l.source,
   }));
 
-  return { summary, sharedIntegrations, manualLinks, live };
+  return { summary, sharedIntegrations, manualLinks, duplicates, live };
 }
 
 export interface SuggestionsView {

@@ -10,6 +10,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Cached embedding of a workflow's "purpose document", for semantic
+/// duplicate detection. Re-embedded only when the workflow's versionId changes.
+model WorkflowEmbedding {
+  workflowId String   @id
+  versionId  String
+  model      String
+  vector     Json
+  updatedAt  DateTime @updatedAt @default(now())
+}
+
 /// Confirmed / inferred ownership + Slack routing target per workflow.
 model OwnerAssignment {
   workflowId         String  @id
