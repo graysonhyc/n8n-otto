@@ -126,6 +126,62 @@ export function subworkflowToolEdges(workflow: N8nWorkflow): SubworkflowToolEdge
   return edges;
 }
 
+const WEBHOOK_TRIGGER_TYPES = new Set([
+  "n8n-nodes-base.webhook",
+  "n8n-nodes-base.formTrigger",
+]);
+const HTTP_REQUEST_TYPE = "n8n-nodes-base.httpRequest";
+
+export interface WebhookHandoffEdge {
+  from: string; // caller workflow id (makes the HTTP request)
+  to: string; // callee workflow id (owns the webhook the request hits)
+  kind: "webhook-handoff";
+  tier: "A";
+}
+
+/**
+ * Runtime hand-offs invisible in the static graph: workflow A makes an HTTP
+ * request whose URL hits workflow B's webhook/form trigger path. A real
+ * dependency (A drives B) with no Execute-Workflow edge. Deterministic: exact
+ * containment of the trigger path segment in the request URL. Self-hits (a
+ * workflow calling its own trigger) are skipped.
+ */
+export function webhookHandoffEdges(workflows: N8nWorkflow[]): WebhookHandoffEdge[] {
+  // callee id → its non-empty trigger paths.
+  const triggerPaths = new Map<string, string[]>();
+  for (const wf of workflows) {
+    const paths: string[] = [];
+    for (const node of wf.nodes) {
+      if (!WEBHOOK_TRIGGER_TYPES.has(node.type)) continue;
+      const p = node.parameters?.path;
+      if (typeof p === "string" && p.length > 0) paths.push(p);
+    }
+    if (paths.length) triggerPaths.set(wf.id, paths);
+  }
+
+  const edges: WebhookHandoffEdge[] = [];
+  const seen = new Set<string>();
+  for (const wf of workflows) {
+    const urls: string[] = [];
+    for (const node of wf.nodes) {
+      if (node.type !== HTTP_REQUEST_TYPE) continue;
+      const u = resolveResource(node.parameters?.url);
+      if (u) urls.push(u);
+    }
+    if (!urls.length) continue;
+    for (const [calleeId, paths] of triggerPaths) {
+      if (calleeId === wf.id) continue; // don't link a workflow to its own trigger
+      const hit = paths.some((p) => urls.some((u) => u.includes(`/${p}`)));
+      const key = `${wf.id}->${calleeId}`;
+      if (hit && !seen.has(key)) {
+        seen.add(key);
+        edges.push({ from: wf.id, to: calleeId, kind: "webhook-handoff", tier: "A" });
+      }
+    }
+  }
+  return edges;
+}
+
 /** Credential id → list of workflow ids that use it. */
 function credentialUsage(workflows: N8nWorkflow[]): Map<string, { name: string; ids: Set<string> }> {
   const usage = new Map<string, { name: string; ids: Set<string> }>();
