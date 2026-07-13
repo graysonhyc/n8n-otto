@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { BriefItem, Severity } from "@/lib/brief/build";
 import { Pill, type Tone } from "@/components/ui/Pill";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
+import { SlackChannelPicker, type SlackChannel } from "@/components/ui/SlackChannelPicker";
 
 const SEV_TONE: Record<Severity, Tone> = { high: "danger", medium: "warn", low: "neutral" };
 const SEV_LABEL: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
@@ -33,7 +36,15 @@ async function setState(key: string, status: "dismissed" | "acknowledged") {
 
 export function BriefCard({ item }: { item: BriefItem }) {
   const { toast, toastUndo } = useToast();
+  const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
+  // Inline owner-assignment: the chosen Slack channel name doubles as the owner
+  // "team" routing key, so assigning here makes that team's channel receive this
+  // workflow's future briefs (same path as the registry's OwnerAssign).
+  const [assigning, setAssigning] = useState(false);
+  const [channel, setChannel] = useState<SlackChannel | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [, startTransition] = useTransition();
 
   function dismiss() {
     setDismissed(true); // optimistic — slide out immediately
@@ -42,6 +53,43 @@ export function BriefCard({ item }: { item: BriefItem }) {
       setDismissed(false);
       void setState(item.key, "acknowledged");
     });
+  }
+
+  // Handle a card action. "Assign owner" opens the channel picker (only if the
+  // item is tied to a workflow); everything else is a stub toast for the demo.
+  function onAction(label: string) {
+    if (label.toLowerCase().includes("assign") && item.workflowId) {
+      setAssigning((v) => !v);
+      return;
+    }
+    toast(label, { detail: item.title, variant: actionMeta(label).primary ? "accent" : "ok" });
+  }
+
+  async function saveOwner() {
+    if (!channel || !item.workflowId) return;
+    setSaving(true);
+    const res = await fetch("/api/owners", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        workflowId: item.workflowId,
+        team: channel.name, // channel name is the routing key downstream
+        slackChannelId: channel.id,
+        slackChannelName: channel.name,
+      }),
+    });
+    setSaving(false);
+    setAssigning(false);
+    if (!res.ok) {
+      toast("Couldn't assign owner", { detail: item.title, variant: "danger" });
+      return;
+    }
+    const label = channel.name.replace(/^#+/, "");
+    toast(`Assigned to #${label}`, {
+      detail: `#${label} will now receive this brief`,
+      variant: "accent",
+    });
+    startTransition(() => router.refresh());
   }
 
   return (
@@ -85,10 +133,12 @@ export function BriefCard({ item }: { item: BriefItem }) {
             .slice(0, 3)
             .map((a) => {
               const { icon, primary } = actionMeta(a);
+              const isAssign = a.toLowerCase().includes("assign") && !!item.workflowId;
               return (
                 <button
                   key={a}
-                  onClick={() => toast(a, { detail: item.title, variant: primary ? "accent" : "ok" })}
+                  onClick={() => onAction(a)}
+                  aria-expanded={isAssign ? assigning : undefined}
                   className={`inline-flex h-[29px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
                     primary
                       ? "border-accent-line bg-accent-dim text-accent-strong hover:border-accent"
@@ -107,6 +157,20 @@ export function BriefCard({ item }: { item: BriefItem }) {
             Dismiss
           </button>
         </div>
+
+        {assigning && (
+          <div className="mt-3 flex w-64 flex-col gap-2 rounded-lg border border-line-2 bg-panel-2 p-2.5">
+            <SlackChannelPicker value={channel?.id ?? null} onChange={setChannel} />
+            <div className="flex gap-2">
+              <Button variant="primary" onClick={saveOwner} disabled={saving || !channel}>
+                {saving ? "Saving…" : "Assign & route brief"}
+              </Button>
+              <Button variant="ghost" onClick={() => setAssigning(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

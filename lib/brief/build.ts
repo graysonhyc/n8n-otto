@@ -151,9 +151,9 @@ function sharedCredentialItem(
       .join(", ")}.`,
     whyItMatters: "Expiry or rotation could break multiple workflows at once.",
     suggestedOwner: "Unassigned",
-    recommendedAction: "Confirm a rotation owner and review the blast radius.",
+    recommendedAction: "Confirm a rotation owner for this credential.",
     workflowId: null,
-    actions: ["View blast radius", "Open credential"],
+    actions: ["Open credential"],
   };
 }
 
