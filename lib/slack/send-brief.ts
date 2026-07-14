@@ -8,19 +8,14 @@ export type SendBriefResult =
   | { ok: false; status: number; error: string }
   | { ok: true; channels: number; posted: number };
 
-// Attention items that make sense to file as a Linear ticket: incidents (recent
-// failures) and behaviour changes. Ownership/hygiene/shared-resource items are
-// fixed in n8n or the registry, not via a ticket, so they are summarised in the
-// stats/insights rather than posted as ticket cards.
-const TICKET_CATEGORIES = new Set(["incident", "change"]);
-
 // Posts one team's daily brief per Slack channel: a deterministic estate-stats
-// card (active/archived/errors/runs + insights), then highlights the issues
-// worth filing as Linear tickets as interactive cards (each carries a "Create
-// Linear ticket" button handled by the interactivity route). Workflows with no
-// owner channel fall back to SLACK_MASTER_CHANNEL_ID (the catch-all ops channel)
-// via loadChannelBriefs; only when that is unset too are they skipped. Shared by
-// the manual "Send to Slack" action and the morning cron.
+// card (active/archived/errors/runs + insights), then EVERY open attention item
+// for that team as its own interactive card (each carries the relevant actions —
+// Assign owner, Create Linear ticket, etc. — handled by the interactivity
+// route). Workflows with no owner channel fall back to SLACK_MASTER_CHANNEL_ID
+// (the catch-all ops channel) via loadChannelBriefs; only when that is unset too
+// are they skipped. Shared by the manual "Send to Slack" action and the morning
+// cron, so the issues always go out with the brief.
 export async function sendDailyBrief(): Promise<SendBriefResult> {
   const install = await getSlackInstall();
   if (!install) return { ok: false, status: 400, error: "Slack not connected" };
@@ -37,7 +32,7 @@ export async function sendDailyBrief(): Promise<SendBriefResult> {
       `${teamName} — Daily Brief`,
     );
 
-    const candidates = ch.attention.filter((a) => TICKET_CATEGORIES.has(a.category));
+    const candidates = ch.attention;
     if (candidates.length === 0) {
       await postBlocks(
         install.botToken,
@@ -45,10 +40,10 @@ export async function sendDailyBrief(): Promise<SendBriefResult> {
         [
           {
             type: "section",
-            text: { type: "mrkdwn", text: "✅ Nothing to file as a Linear ticket today." },
+            text: { type: "mrkdwn", text: "✅ Nothing needs attention today." },
           },
         ],
-        "No ticket-worthy issues",
+        "No open issues",
       );
       continue;
     }
@@ -61,12 +56,13 @@ export async function sendDailyBrief(): Promise<SendBriefResult> {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `🎫 *${candidates.length} issue${candidates.length === 1 ? "" : "s"} you can file as a Linear ticket*`,
+            text: `⚠️ *${candidates.length} issue${candidates.length === 1 ? "" : "s"} need attention*`,
           },
         },
       ],
-      "Issues to file as Linear tickets",
+      "Open issues",
     );
+    // Every open issue for this team gets its own card.
     for (const item of candidates) {
       await postBlocks(install.botToken, ch.channelId, briefItemBlocks(item), item.title);
       posted++;

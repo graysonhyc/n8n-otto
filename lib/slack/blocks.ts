@@ -5,6 +5,16 @@ import type { TeamStats } from "@/lib/brief/teamStats";
 import type { SopSuggestion } from "@/lib/derive/suggestions";
 
 const EMOJI: Record<Severity, string> = { high: "🔴", medium: "🟠", low: "🟡" };
+const SEV_LABEL: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
+const CATEGORY_LABEL: Record<BriefItem["category"], string> = {
+  change: "Behaviour change",
+  incident: "Incident",
+  ownership: "Ownership",
+  governance: "Governance",
+  hygiene: "Hygiene",
+  "shared-resource": "Shared resource",
+  duplicate: "Possible duplicate",
+};
 
 function button(text: string, actionId: string, value: string, style?: "primary" | "danger") {
   return {
@@ -16,16 +26,25 @@ function button(text: string, actionId: string, value: string, style?: "primary"
   };
 }
 
-// A single Brief item as a Slack message (used for health/change alerts).
+// A single Brief item as a Slack message card. Leads with a divider so a run of
+// cards reads as distinct, tidy blocks; a context line labels severity +
+// category; then the What/Why/Owner/Recommended fields and the action buttons.
 export function briefItemBlocks(item: BriefItem, routedNote?: string): KnownBlock[] {
   const value = JSON.stringify({ key: item.key, workflowId: item.workflowId });
   const blocks: KnownBlock[] = [
+    { type: "divider" },
     {
       type: "section",
       text: {
         type: "mrkdwn",
         text: `${EMOJI[item.severity]} *${item.title}*`,
       },
+    },
+    {
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: `*${SEV_LABEL[item.severity]}*  ·  ${CATEGORY_LABEL[item.category]}` },
+      ],
     },
     {
       type: "section",
@@ -45,9 +64,12 @@ export function briefItemBlocks(item: BriefItem, routedNote?: string): KnownBloc
     });
   }
 
+  // Open-in-n8n and Assign-owner only make sense for a single-workflow item;
+  // credential-scoped items (workflowId null) skip them.
   const actions = [
-    button("Open in n8n", "open_in_n8n", value),
-    button("Assign owner", "assign_owner", value),
+    ...(item.workflowId
+      ? [button("Open in n8n", "open_in_n8n", value), button("Assign owner", "assign_owner", value)]
+      : []),
     button("Create Linear ticket", "create_ticket", value),
     button("Acknowledge", "acknowledge", value, "primary"),
   ];
