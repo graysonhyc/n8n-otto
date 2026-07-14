@@ -1,30 +1,46 @@
 import type { RelationshipsView } from "@/lib/data/map";
 
-function Tile({ label, value, hint }: { label: string; value: number; hint?: string }) {
-  return (
-    <div className="rounded-xl border border-line bg-panel p-4 shadow-card">
-      <div className="text-[22px] font-semibold text-ink nums leading-none">{value}</div>
-      <div className="mt-1.5 text-[12px] font-medium text-ink">{label}</div>
-      {hint && <div className="text-[11px] text-faint">{hint}</div>}
-    </div>
-  );
-}
-
 /**
- * Estate relationship summary + tables. Deliberately NOT an estate-wide graph
- * (does not scale): headline coupling metrics, the integrations shared by ≥2
- * workflows (blast surface), and possible semantic duplicates.
+ * Estate relationship tables. Deliberately NOT an estate-wide graph (does not
+ * scale): the concrete workflow→workflow connections, the integrations shared by
+ * ≥2 workflows (blast surface), and possible semantic duplicates.
  */
 export function RelationshipDashboard({ view }: { view: RelationshipsView }) {
-  const { summary, sharedIntegrations, duplicates } = view;
+  const { connections, sharedIntegrations, duplicates } = view;
   return (
     <div className="mb-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile label="Shared integrations" value={sharedIntegrations.length} hint="used by ≥2 workflows" />
-        <Tile label="Connections" value={summary.connectionCount} hint="sub-calls, agents, webhooks" />
-        <Tile label="Shared data sources" value={summary.dataSourceLinkCount} hint="same sheet/table/folder" />
-        <Tile label="Possible duplicates" value={duplicates.length} hint="semantically similar" />
-      </div>
+      <section className="rounded-xl border border-line bg-panel shadow-card">
+        <div className="border-b border-line px-4 py-3">
+          <h2 className="text-[11.5px] font-semibold tracking-[0.07em] text-muted uppercase">
+            Connections
+          </h2>
+          <p className="mt-0.5 text-[11px] text-faint">
+            Direct workflow-to-workflow dependencies: sub-workflow calls, agent sub-workflows, and webhook hand-offs.
+          </p>
+        </div>
+        {connections.length === 0 ? (
+          <p className="px-4 py-6 text-[13px] text-faint">No workflow directly calls or depends on another yet.</p>
+        ) : (
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-left text-[11px] text-faint">
+                <th className="px-4 py-2 font-medium">Workflow</th>
+                <th className="px-4 py-2 font-medium">Depends on</th>
+                <th className="px-4 py-2 font-medium">Via</th>
+              </tr>
+            </thead>
+            <tbody>
+              {connections.map((c, i) => (
+                <tr key={`${c.fromName}|${c.toName}|${i}`} className="border-t border-line-2">
+                  <td className="px-4 py-2 font-medium text-ink">{c.fromName}</td>
+                  <td className="px-4 py-2 font-medium text-ink">{c.toName}</td>
+                  <td className="px-4 py-2 text-muted">{c.kind}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <section className="rounded-xl border border-line bg-panel shadow-card">
         <div className="border-b border-line px-4 py-3">

@@ -5,6 +5,7 @@ import { getAllOwners, getBriefStates, getAllLinks } from "@/lib/backoffice/stor
 import { composeRegistry } from "@/lib/derive/registry";
 import { credentialGroups } from "@/lib/derive/edges";
 import { composeGraph } from "@/lib/derive/graph";
+import { computeSimilarPairs } from "./duplicates";
 import { blastRadius, type BlastRadius } from "@/lib/derive/blast";
 import { buildBrief, type BriefItem } from "@/lib/brief/build";
 import { computeDailyBrief, type DailyBrief } from "@/lib/brief/daily";
@@ -56,8 +57,9 @@ export async function loadBrief(): Promise<BriefView> {
   const items = composeRegistry({ workflows, executions, owners, now });
   const sharedCredentials = credentialGroups(workflows);
   const blastById = blastMap(workflows, executions, owners, links, groupNames, now);
+  const duplicates = await computeSimilarPairs(workflows);
 
-  const brief = buildBrief({ items, changes, sharedCredentials, blastById }).filter(
+  const brief = buildBrief({ items, changes, sharedCredentials, blastById, duplicates }).filter(
     (b) => states.get(b.key) !== "dismissed",
   );
 
@@ -88,8 +90,9 @@ export async function loadDailyBrief(): Promise<DailyBriefView> {
   const items = composeRegistry({ workflows, executions, owners, now });
   const sharedCredentials = credentialGroups(workflows);
   const blastById = blastMap(workflows, executions, owners, links, groupNames, now);
+  const duplicates = await computeSimilarPairs(workflows);
 
-  const attention = buildBrief({ items, changes, sharedCredentials, blastById }).filter(
+  const attention = buildBrief({ items, changes, sharedCredentials, blastById, duplicates }).filter(
     (b) => states.get(b.key) !== "dismissed",
   );
 
@@ -123,8 +126,9 @@ export async function loadChannelBriefs(): Promise<ChannelBriefsView> {
   const items = composeRegistry({ workflows, executions, owners, now });
   const sharedCredentials = credentialGroups(workflows);
   const blastById = blastMap(workflows, executions, owners, links, groupNames, now);
+  const duplicates = await computeSimilarPairs(workflows);
 
-  const attention = buildBrief({ items, changes, sharedCredentials, blastById }).filter(
+  const attention = buildBrief({ items, changes, sharedCredentials, blastById, duplicates }).filter(
     (b) => states.get(b.key) !== "dismissed",
   );
 

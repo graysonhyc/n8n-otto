@@ -7,6 +7,7 @@ import { integrationForNode } from "./integrations";
 export interface CallEdge {
   from: string; // workflow id
   to: string; // workflow id
+  toName?: string; // cachedResultName, for re-linking when `to` is a stale id
   kind: "calls";
   tier: "A";
 }
@@ -50,12 +51,30 @@ function referencedWorkflowId(params: Record<string, unknown> | undefined): stri
   return null;
 }
 
+/**
+ * The workflow name n8n caches on a resource-locator (`cachedResultName`). Used
+ * as a fallback key when the referenced id is stale — a common import artifact
+ * where a template's sub-workflow references point at the original ids while the
+ * imported copies got fresh ones. The name still matches, so we can re-link.
+ */
+function referencedWorkflowName(params: Record<string, unknown> | undefined): string | null {
+  const wf = params?.workflowId;
+  if (wf && typeof wf === "object" && "cachedResultName" in wf) {
+    const n = (wf as { cachedResultName: unknown }).cachedResultName;
+    if (typeof n === "string" && n.length > 0) return n;
+  }
+  return null;
+}
+
 export function workflowCallEdges(workflow: N8nWorkflow): CallEdge[] {
   const edges: CallEdge[] = [];
   for (const node of workflow.nodes) {
     if (node.type !== EXECUTE_WORKFLOW_TYPE) continue;
     const to = referencedWorkflowId(node.parameters);
-    if (to) edges.push({ from: workflow.id, to, kind: "calls", tier: "A" });
+    if (to) {
+      const toName = referencedWorkflowName(node.parameters);
+      edges.push({ from: workflow.id, to, ...(toName ? { toName } : {}), kind: "calls", tier: "A" });
+    }
   }
   return edges;
 }
@@ -82,6 +101,7 @@ export function agentToolEdges(workflow: N8nWorkflow): AgentToolEdge[] {
 export interface SubworkflowToolEdge {
   from: string; // caller (agent-hosting) workflow id
   to: string; // referenced sub-workflow id, exposed as a tool
+  toName?: string; // cachedResultName, for re-linking when `to` is a stale id
   kind: "subworkflow-tool";
   tier: "A";
 }
@@ -98,26 +118,32 @@ export function subworkflowToolEdges(workflow: N8nWorkflow): SubworkflowToolEdge
   );
   if (agents.size === 0) return [];
 
-  // node name → referenced workflow id, for tool-capable nodes only.
-  const refByNode = new Map<string, string>();
+  // node name → referenced workflow {id, name}, for tool-capable nodes only.
+  const refByNode = new Map<string, { id: string; name: string | null }>();
   for (const node of workflow.nodes) {
     if (node.type !== TOOL_WORKFLOW_TYPE && node.type !== EXECUTE_WORKFLOW_TYPE) continue;
     const ref = referencedWorkflowId(node.parameters);
-    if (ref) refByNode.set(node.name, ref);
+    if (ref) refByNode.set(node.name, { id: ref, name: referencedWorkflowName(node.parameters) });
   }
 
   const edges: SubworkflowToolEdge[] = [];
   const seen = new Set<string>();
   for (const [sourceName, byType] of Object.entries(workflow.connections)) {
     if (!byType.ai_tool) continue;
-    const to = refByNode.get(sourceName);
-    if (!to || seen.has(to)) continue;
+    const ref = refByNode.get(sourceName);
+    if (!ref || seen.has(ref.id)) continue;
     const feedsAgent = byType.ai_tool.some((group) =>
       group.some((t) => agents.has(t.node)),
     );
     if (feedsAgent) {
-      seen.add(to);
-      edges.push({ from: workflow.id, to, kind: "subworkflow-tool", tier: "A" });
+      seen.add(ref.id);
+      edges.push({
+        from: workflow.id,
+        to: ref.id,
+        ...(ref.name ? { toName: ref.name } : {}),
+        kind: "subworkflow-tool",
+        tier: "A",
+      });
     }
   }
   return edges;

@@ -97,13 +97,29 @@ export interface DuplicateRow {
   score: number;
 }
 
+/** One directed workflow→workflow connection for the connections table. */
+export interface ConnectionRow {
+  fromName: string;
+  toName: string;
+  kind: string; // human label ("Agent sub-workflow", "Sub-workflow call", …)
+}
+
 export interface RelationshipsView {
   summary: RelationshipSummary;
+  connections: ConnectionRow[];
   sharedIntegrations: SharedIntegrationRow[];
   manualLinks: ManualLinkRow[];
   duplicates: DuplicateRow[];
   live: boolean;
 }
+
+// Human labels for the deterministic structural relationship kinds shown in the
+// connections table.
+const CONNECTION_LABELS: Record<string, string> = {
+  "structural:subagent": "Agent sub-workflow",
+  "structural:subworkflow": "Sub-workflow call",
+  "structural:webhook": "Webhook hand-off",
+};
 
 /**
  * Estate-wide relationship dashboard data: the four-signal summary, the
@@ -115,8 +131,19 @@ export async function loadRelationshipsView(): Promise<RelationshipsView> {
   const similar = await computeSimilarPairs(workflows);
   const nameById = new Map(workflows.map((w) => [w.id, w.name]));
 
-  const { summary } = deriveRelationships(workflows);
+  const { summary, edges } = deriveRelationships(workflows);
   summary.duplicateCount = similar.length;
+
+  // The actual workflow→workflow connections behind the "Connections" count:
+  // deterministic structural edges (sub-calls, agent sub-workflows, webhooks).
+  const connections: ConnectionRow[] = edges
+    .filter((e) => e.kind in CONNECTION_LABELS)
+    .map((e) => ({
+      fromName: nameById.get(e.from) ?? e.from,
+      toName: nameById.get(e.to) ?? e.to,
+      kind: CONNECTION_LABELS[e.kind],
+    }))
+    .sort((a, b) => a.fromName.localeCompare(b.fromName) || a.toName.localeCompare(b.toName));
 
   const duplicates: DuplicateRow[] = similar.map((p) => ({
     aName: nameById.get(p.a) ?? p.a,
@@ -148,7 +175,7 @@ export async function loadRelationshipsView(): Promise<RelationshipsView> {
     source: l.source,
   }));
 
-  return { summary, sharedIntegrations, manualLinks, duplicates, live };
+  return { summary, connections, sharedIntegrations, manualLinks, duplicates, live };
 }
 
 export interface SuggestionsView {

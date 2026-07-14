@@ -1,19 +1,26 @@
 import type { RegistryItem } from "@/lib/derive/registry";
 import type { ChangeEvent } from "@/lib/diff/snapshot";
 import type { BlastRadius } from "@/lib/derive/blast";
+import type { SimilarPair } from "@/lib/derive/similarity";
 
 export type Severity = "high" | "medium" | "low";
 
 export interface BriefItem {
   key: string;
   severity: Severity;
-  category: "change" | "ownership" | "shared-resource" | "governance" | "hygiene" | "incident";
+  category: "change" | "ownership" | "shared-resource" | "governance" | "hygiene" | "incident" | "duplicate";
   title: string;
   whatHappened: string;
   whyItMatters: string;
   suggestedOwner: string;
   recommendedAction: string;
   workflowId: string | null;
+  // Extra workflows this item concerns (e.g. every workflow using a shared
+  // credential). Used to route a workflow-less item to each affected team.
+  workflowIds?: string[];
+  // True when the underlying workflow already has a confirmed owner — the card
+  // then shows the team instead of an "Assign owner" affordance.
+  owned: boolean;
   actions: string[];
 }
 
@@ -58,6 +65,7 @@ function promptItem(
     suggestedOwner: item.owner?.team ?? "Unassigned",
     recommendedAction: "Request approval before production use.",
     workflowId: item.id,
+    owned: !!item.owner,
     actions: ["Open in n8n", "Request approval", "Rollback prompt", "Create Linear ticket"],
   };
 }
@@ -76,6 +84,7 @@ function incidentItem(item: RegistryItem, blastNote: string | null = null): Brie
     suggestedOwner: item.owner?.team ?? item.project ?? "Unassigned",
     recommendedAction: "Check the connection, then replay failed executions.",
     workflowId: item.id,
+    owned: !!item.owner,
     actions: ["Open in n8n", "Assign owner", "Create Linear ticket"],
   };
 }
@@ -96,6 +105,7 @@ function danglingItem(item: RegistryItem): BriefItem | null {
     suggestedOwner: item.owner?.team ?? item.project ?? "Unassigned",
     recommendedAction: "Reconnect or remove the dangling nodes in n8n.",
     workflowId: item.id,
+    owned: !!item.owner,
     actions: ["Open in n8n", "Assign owner"],
   };
 }
@@ -116,6 +126,7 @@ function ownershipItem(item: RegistryItem): BriefItem | null {
     suggestedOwner: item.project ?? "Unassigned",
     recommendedAction: "Assign an owner and Slack channel.",
     workflowId: item.id,
+    owned: false,
     actions: ["Assign owner", "Open in n8n"],
   };
 }
@@ -132,6 +143,7 @@ function governanceItem(item: RegistryItem): BriefItem | null {
     suggestedOwner: item.owner?.team ?? item.project ?? "Unassigned",
     recommendedAction: "Add a review step or require approval for tool actions.",
     workflowId: item.id,
+    owned: !!item.owner,
     actions: ["Open in n8n", "Add review step"],
   };
 }
@@ -139,8 +151,13 @@ function governanceItem(item: RegistryItem): BriefItem | null {
 function sharedCredentialItem(
   info: SharedCredentialInfo,
   names: Map<string, string>,
+  teamById: Map<string, string>,
 ): BriefItem | null {
   if (info.workflowIds.length < 3) return null;
+  // Owning teams of the workflows that share this credential — this brief is
+  // routed to each of them (channels.ts matches on workflowIds), so every
+  // affected team hears that a credential they depend on is shared.
+  const teams = [...new Set(info.workflowIds.map((id) => teamById.get(id)).filter(Boolean))] as string[];
   return {
     key: `shared:${info.credentialId}`,
     severity: "medium",
@@ -150,10 +167,36 @@ function sharedCredentialItem(
       .map((id) => names.get(id) ?? id)
       .join(", ")}.`,
     whyItMatters: "Expiry or rotation could break multiple workflows at once.",
-    suggestedOwner: "Unassigned",
+    suggestedOwner: teams.length ? teams.join(", ") : "Unassigned",
     recommendedAction: "Confirm a rotation owner for this credential.",
     workflowId: null,
+    workflowIds: info.workflowIds,
+    owned: teams.length > 0,
     actions: ["Open credential"],
+  };
+}
+
+function duplicateItem(pair: SimilarPair, byId: Map<string, RegistryItem>): BriefItem | null {
+  const a = byId.get(pair.a);
+  const b = byId.get(pair.b);
+  if (!a || !b) return null;
+  const pct = Math.round(pair.score * 100);
+  // Anchor the item on the workflow that has an owner (so it routes), else `a`.
+  const anchor = a.owner ? a : b.owner ? b : a;
+  const other = anchor === a ? b : a;
+  return {
+    key: `duplicate:${[pair.a, pair.b].sort().join(":")}`,
+    severity: "medium",
+    category: "duplicate",
+    title: `${anchor.name} looks like a duplicate of ${other.name}`,
+    whatHappened: `${pct}% similar to ${other.name} — likely the same job built twice.`,
+    whyItMatters: "Duplicated workflows drift out of sync and double the maintenance and blast surface.",
+    suggestedOwner: anchor.owner?.team ?? anchor.project ?? "Unassigned",
+    recommendedAction: "Consolidate or delete one, or confirm they're intentionally separate.",
+    workflowId: anchor.id,
+    workflowIds: [anchor.id, other.id],
+    owned: !!anchor.owner,
+    actions: ["Open in n8n", "Assign owner"],
   };
 }
 
@@ -178,8 +221,15 @@ export function buildBrief(input: {
   changes: Map<string, ChangeEvent[]>;
   sharedCredentials: SharedCredentialInfo[];
   blastById?: Map<string, BlastRadius>;
+  duplicates?: SimilarPair[];
 }): BriefItem[] {
   const names = new Map(input.items.map((i) => [i.id, i.name]));
+  const byId = new Map(input.items.map((i) => [i.id, i]));
+  // workflow id → owning team, for routing credential-scoped briefs to every
+  // affected team.
+  const teamById = new Map(
+    input.items.filter((i) => i.owner).map((i) => [i.id, i.owner!.team]),
+  );
   const out: BriefItem[] = [];
 
   for (const item of input.items) {
@@ -198,8 +248,13 @@ export function buildBrief(input: {
   }
 
   for (const info of input.sharedCredentials) {
-    const shared = sharedCredentialItem(info, names);
+    const shared = sharedCredentialItem(info, names, teamById);
     if (shared) out.push(shared);
+  }
+
+  for (const pair of input.duplicates ?? []) {
+    const dup = duplicateItem(pair, byId);
+    if (dup) out.push(dup);
   }
 
   return out.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);

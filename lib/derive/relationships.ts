@@ -70,6 +70,22 @@ export function deriveRelationships(workflows: N8nWorkflow[]): {
 } {
   const edges: RelationshipEdge[] = [];
   const ids = new Set(workflows.map((w) => w.id));
+  // name → id, to re-link structural edges whose referenced id is stale (a
+  // common import artifact: the sub-workflow was re-created with a fresh id but
+  // the caller still points at the template's original id). Only used as a
+  // fallback when the id itself isn't in the estate, and only when the name maps
+  // to exactly one workflow (ambiguous names are left unresolved).
+  const idByName = new Map<string, string | null>();
+  for (const w of workflows) {
+    idByName.set(w.name, idByName.has(w.name) ? null : w.id);
+  }
+  // Resolve a structural edge's target: the id if it exists, else its
+  // cachedResultName if that uniquely identifies a workflow, else null.
+  const resolveTarget = (to: string, toName?: string): string | null => {
+    if (ids.has(to)) return to;
+    if (toName) return idByName.get(toName) ?? null;
+    return null;
+  };
 
   // 1 — shared credential (already one edge per pair).
   for (const e of sharedCredentialEdges(workflows)) {
@@ -99,16 +115,18 @@ export function deriveRelationships(workflows: N8nWorkflow[]): {
   // 4a — Execute-Workflow sub-call.
   for (const wf of workflows) {
     for (const e of workflowCallEdges(wf)) {
-      if (!ids.has(e.to)) continue;
-      edges.push({ from: e.from, to: e.to, kind: "structural:subworkflow", tier: "A" });
+      const to = resolveTarget(e.to, e.toName);
+      if (!to) continue;
+      edges.push({ from: e.from, to, kind: "structural:subworkflow", tier: "A" });
     }
   }
 
   // 4b — sub-workflow exposed to an agent as a tool.
   for (const wf of workflows) {
     for (const e of subworkflowToolEdges(wf)) {
-      if (!ids.has(e.to)) continue;
-      edges.push({ from: e.from, to: e.to, kind: "structural:subagent", tier: "A" });
+      const to = resolveTarget(e.to, e.toName);
+      if (!to) continue;
+      edges.push({ from: e.from, to, kind: "structural:subagent", tier: "A" });
     }
   }
 

@@ -51,9 +51,8 @@ export function BriefBoard({ items, scanned }: { items: BriefItem[]; scanned: nu
     () => ({
       all: items.length,
       high: items.filter((i) => i.severity === "high").length,
-      unowned: items.filter((i) => i.suggestedOwner === "Unassigned").length,
-      change: items.filter((i) => i.category === "change").length,
-      ownership: items.filter((i) => i.category === "ownership").length,
+      medium: items.filter((i) => i.severity === "medium").length,
+      low: items.filter((i) => i.severity === "low").length,
     }),
     [items],
   );
@@ -64,10 +63,10 @@ export function BriefBoard({ items, scanned }: { items: BriefItem[]; scanned: nu
   return (
     <>
       <div className="mb-4.5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Needs attention" value={counts.all} detail={`${scanned} workflows scanned`} color="var(--color-danger)" />
-        <Stat label="High priority" value={counts.high} detail="review before next run" color="var(--color-change)" />
-        <Stat label="Recent changes" value={counts.change} detail="behaviour or config edits" color="var(--color-warn)" />
-        <Stat label="Ownership gaps" value={counts.ownership} detail="no accountable owner" color="var(--color-ok)" />
+        <Stat label="Total issues" value={counts.all} detail={`${scanned} workflows scanned`} color="#b6b8bf" />
+        <Stat label="High" value={counts.high} detail="review before next run" color="var(--color-danger)" />
+        <Stat label="Medium" value={counts.medium} detail="worth a look" color="var(--color-warn)" />
+        <Stat label="Low" value={counts.low} detail="minor / informational" color="var(--color-ok)" />
       </div>
 
       <div className="mb-3.5 flex flex-wrap items-center gap-2">
@@ -85,7 +84,7 @@ export function BriefBoard({ items, scanned }: { items: BriefItem[]; scanned: nu
             >
               {f.label}
               <span className={`font-mono text-[11px] ${on ? "text-accent" : "text-faint"}`}>
-                {counts[f.key]}
+                {items.filter(f.test).length}
               </span>
             </button>
           );

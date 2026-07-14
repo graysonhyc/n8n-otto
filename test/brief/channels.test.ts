@@ -103,6 +103,7 @@ describe("groupBriefsByChannel", () => {
         suggestedOwner: "",
         recommendedAction: "",
         workflowId: ids[0],
+        owned: false,
         actions: [],
       },
     ];
@@ -111,5 +112,37 @@ describe("groupBriefsByChannel", () => {
     const b = briefs.find((b) => b.channelId === "C_B")!;
     expect(a.attention).toHaveLength(1);
     expect(b.attention).toHaveLength(0);
+  });
+
+  it("routes a workflow-less item to every team whose workflow it lists", () => {
+    // A shared-credential brief (workflowId null) spanning a workflow in each team
+    // must reach both teams, not be dropped.
+    const ids = allWorkflows.map((w) => w.id);
+    const owners = new Map<string, Owner>([
+      [ids[0], owner(ids[0], "C_A")],
+      [ids[1], owner(ids[1], "C_B")],
+    ]);
+    const items = composeRegistry({ workflows: allWorkflows, executions, owners, now: NOW });
+    const attention = [
+      {
+        key: "shared:cred1",
+        severity: "medium" as const,
+        category: "shared-resource" as const,
+        title: "cred shared",
+        whatHappened: "",
+        whyItMatters: "",
+        suggestedOwner: "",
+        recommendedAction: "",
+        workflowId: null,
+        workflowIds: [ids[0], ids[1]],
+        owned: true,
+        actions: [],
+      },
+    ];
+    const briefs = groupBriefsByChannel({ items, executions, attention, now: NOW });
+    const a = briefs.find((b) => b.channelId === "C_A")!;
+    const b = briefs.find((b) => b.channelId === "C_B")!;
+    expect(a.attention).toHaveLength(1);
+    expect(b.attention).toHaveLength(1);
   });
 });

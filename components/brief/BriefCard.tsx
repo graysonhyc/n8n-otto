@@ -94,8 +94,12 @@ export function BriefCard({ item }: { item: BriefItem }) {
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border border-line bg-panel shadow-card transition-[opacity,transform,margin,max-height,box-shadow,border-color] duration-200 hover:border-line-2 hover:shadow-card-hover ${
-        dismissed ? "pointer-events-none -mt-[1px] max-h-0 translate-x-6 opacity-0" : "max-h-[520px]"
+      className={`rounded-xl border border-line bg-panel shadow-card transition-[opacity,transform,margin,box-shadow,border-color] duration-200 hover:border-line-2 hover:shadow-card-hover ${
+        dismissed
+          ? "pointer-events-none -mt-[1px] max-h-0 translate-x-6 overflow-hidden opacity-0"
+          : assigning
+            ? "overflow-visible" // let the channel dropdown escape the card
+            : "max-h-[520px] overflow-hidden"
       }`}
     >
       <div className="p-4">
@@ -130,6 +134,9 @@ export function BriefCard({ item }: { item: BriefItem }) {
           )}
           {item.actions
             .filter((a) => !a.toLowerCase().startsWith("open"))
+            // Drop "Assign owner" once the workflow already has a confirmed
+            // owner — the Owner row above shows the team instead.
+            .filter((a) => !(item.owned && a.toLowerCase().includes("assign")))
             .slice(0, 3)
             .map((a) => {
               const { icon, primary } = actionMeta(a);

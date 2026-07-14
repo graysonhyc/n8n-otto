@@ -58,7 +58,14 @@ export function groupBriefsByChannel(input: {
   const out: ChannelBrief[] = [];
   for (const [channelId, { channelName, ids }] of buckets) {
     const items = input.items.filter((i) => ids.has(i.id));
-    const attention = input.attention.filter((a) => a.workflowId != null && ids.has(a.workflowId));
+    // Attach an item to this team when it targets one of the team's workflows —
+    // either directly (workflowId) or as one of several affected workflows
+    // (workflowIds, e.g. a shared-credential brief spanning multiple teams).
+    const attention = input.attention.filter(
+      (a) =>
+        (a.workflowId != null && ids.has(a.workflowId)) ||
+        (a.workflowIds?.some((id) => ids.has(id)) ?? false),
+    );
     const stats = computeTeamStats({
       items,
       executions: input.executions,
